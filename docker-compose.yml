@@ -1,0 +1,99 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: smartcity
+      POSTGRES_PASSWORD: smartcity
+      POSTGRES_DB: smartcity
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartcity"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    # Cap Redis so it can't grow into the memory the API needs on a laptop.
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8001:8000"
+    environment:
+      SMARTCITY_POSTGRES_URL: postgresql://smartcity:smartcity@postgres:5432/smartcity
+      SMARTCITY_REDIS_URL: redis://redis:6379/0
+      SMARTCITY_MODEL_MODE: mock
+      SMARTCITY_CORS_ORIGINS: '["http://localhost:3000","http://localhost:3001"]'
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./backend/app:/app/app
+
+  celery_worker:
+    build: ./backend
+    # Two workers instead of the default (one per CPU) — this stack shares a
+    # laptop, and the task load is bursty ingest work, not steady throughput.
+    # -B embeds the Beat scheduler in this same process. A dedicated `celery
+    # beat` service is the right shape once there's more than one worker node
+    # (otherwise each node re-schedules the same task); at single-node scale
+    # here, running it embedded is what actually makes beat_schedule fire —
+    # without -B (or a separate beat container) nothing schedules the nightly
+    # road-damage scan or the camera health-sweep at all.
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 -B
+    environment:
+      SMARTCITY_POSTGRES_URL: postgresql://smartcity:smartcity@postgres:5432/smartcity
+      SMARTCITY_REDIS_URL: redis://redis:6379/0
+      SMARTCITY_MODEL_MODE: mock
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./backend/app:/app/app
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3001:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8001
+    depends_on:
+      - backend
+    volumes:
+      # Bind the source so `next dev` hot-reloads edits, matching the backend.
+      # node_modules is deliberately NOT mounted — it stays the image's copy,
+      # so host/container platform differences can't corrupt it.
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/next.config.js:/app/next.config.js
+      - ./frontend/tailwind.config.ts:/app/tailwind.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+
+  # MongoDB is in the architecture for raw CV frame metadata and LLM logs, but
+  # no code path uses it yet. Kept out of the default stack so the POC fits on
+  # a laptop; start it with:  docker compose --profile full up -d
+  mongo:
+    image: mongo:7
+    profiles: ["full"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  postgres_data:
+  mongo_data:

@@ -1,0 +1,22 @@
+[
+  {"id": 1,  "name": "Trade Centre Roundabout (SZR Interchange 1)", "lat": 25.2285, "lon": 55.2867, "has_signal": true,  "emirate": "Dubai", "road_ref": "E11"},
+  {"id": 2,  "name": "Al Garhoud Bridge", "lat": 25.2450, "lon": 55.3320, "has_signal": false, "emirate": "Dubai", "road_ref": "D89"},
+  {"id": 3,  "name": "Al Maktoum Bridge", "lat": 25.2404, "lon": 55.3131, "has_signal": false, "emirate": "Dubai", "road_ref": "D85"},
+  {"id": 4,  "name": "Business Bay Crossing", "lat": 25.1870, "lon": 55.2620, "has_signal": false, "emirate": "Dubai", "road_ref": "E11"},
+  {"id": 5,  "name": "Defence Roundabout (Interchange 2)", "lat": 25.2180, "lon": 55.2790, "has_signal": true,  "emirate": "Dubai", "road_ref": "E11"},
+  {"id": 6,  "name": "Mall of the Emirates Interchange (4)", "lat": 25.1180, "lon": 55.2000, "has_signal": false, "emirate": "Dubai", "road_ref": "E11"},
+  {"id": 7,  "name": "Dubai Marina Interchange (5)", "lat": 25.0780, "lon": 55.1400, "has_signal": false, "emirate": "Dubai", "road_ref": "E11"},
+  {"id": 8,  "name": "Jebel Ali Interchange (7)", "lat": 25.0100, "lon": 55.1000, "has_signal": false, "emirate": "Dubai", "road_ref": "E11"},
+  {"id": 9,  "name": "Al Ittihad Road – Dubai/Sharjah Border", "lat": 25.2900, "lon": 55.3700, "has_signal": true,  "emirate": "Dubai", "road_ref": "E11"},
+  {"id": 10, "name": "Emirates Road – Al Awir Junction", "lat": 25.1700, "lon": 55.4400, "has_signal": false, "emirate": "Dubai", "road_ref": "E611"},
+  {"id": 11, "name": "Al Khail Road – Al Quoz", "lat": 25.1420, "lon": 55.2340, "has_signal": false, "emirate": "Dubai", "road_ref": "E44"},
+  {"id": 12, "name": "Sheikh Mohammed Bin Zayed Rd – Silicon Oasis", "lat": 25.1180, "lon": 55.3800, "has_signal": false, "emirate": "Dubai", "road_ref": "E311"},
+  {"id": 13, "name": "Abu Dhabi Corniche – Khalifa St", "lat": 24.4750, "lon": 54.3400, "has_signal": true,  "emirate": "Abu Dhabi", "road_ref": "E12"},
+  {"id": 14, "name": "Sheikh Zayed Bridge (Abu Dhabi)", "lat": 24.4180, "lon": 54.4360, "has_signal": false, "emirate": "Abu Dhabi", "road_ref": "E10"},
+  {"id": 15, "name": "Al Reem Island Access", "lat": 24.4990, "lon": 54.4020, "has_signal": true,  "emirate": "Abu Dhabi", "road_ref": "E12"},
+  {"id": 16, "name": "Sharjah – Al Wahda Street", "lat": 25.3380, "lon": 55.4100, "has_signal": true,  "emirate": "Sharjah", "road_ref": "E11"},
+  {"id": 17, "name": "Ajman Corniche Junction", "lat": 25.4110, "lon": 55.4350, "has_signal": true,  "emirate": "Ajman", "road_ref": "E11"},
+  {"id": 18, "name": "Ras Al Khaimah – Al Muntasir Rd", "lat": 25.7890, "lon": 55.9430, "has_signal": true,  "emirate": "Ras Al Khaimah", "road_ref": "E11"},
+  {"id": 19, "name": "Fujairah Port Approach", "lat": 25.1300, "lon": 56.3350, "has_signal": true,  "emirate": "Fujairah", "road_ref": "E99"},
+  {"id": 20, "name": "Al Ain – Hili Junction", "lat": 24.2500, "lon": 55.7830, "has_signal": true,  "emirate": "Abu Dhabi", "road_ref": "E20"}
+]

@@ -1,0 +1,251 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Typography: Geist and Geist Mono — Vercel's typeface. Chosen over the
+  previous Space Grotesk / IBM Plex pairing because Geist's tighter apertures
+  and true optical sizing hold up at both 11px table text and 60px display,
+  which this product needs on the same screen.
+*/
+:root {
+  --font-display: "Geist", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Geist", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body {
+  background-color: #081A2E;
+  color: #EDEEE7;
+}
+
+body {
+  font-family: var(--font-body);
+  letter-spacing: -0.011em;
+}
+
+/* The blueprint grid stays, but softer — it should read as texture behind the
+   content, not as a competing layer. */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(143, 217, 232, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(143, 217, 232, 0.045) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.03em;
+}
+
+/* ---------------------------------------------------------------- motion */
+/*
+  Scroll-reveal. Elements start slightly low and transparent, then settle.
+  The transform is the only animated property besides opacity so it stays on
+  the compositor and never triggers layout.
+*/
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.7s var(--ease-out-expo),
+    transform 0.7s var(--ease-out-expo);
+  will-change: opacity, transform;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-22px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes sheen {
+  from { transform: translateX(-120%); }
+  to   { transform: translateX(220%); }
+}
+
+.animate-fade-up { animation: fade-up 0.8s var(--ease-out-expo) both; }
+.animate-fade-in { animation: fade-in 0.9s ease both; }
+.animate-slide-in { animation: slide-in-left 0.7s var(--ease-out-expo) both; }
+
+/* Anyone who has asked their OS to stop moving things gets a static page. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .animate-fade-up, .animate-fade-in, .animate-slide-in { animation: none; }
+}
+
+/* ------------------------------------------------------------ components */
+/* Corner-bracket frame — a surveyor's viewfinder mark. Kept from the original
+   design language; it is what makes a panel read as an instrument. */
+.blueprint-frame {
+  position: relative;
+}
+.blueprint-frame::before,
+.blueprint-frame::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: #8FD9E8;
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+.blueprint-frame::before {
+  top: -1px; left: -1px;
+  border-top: 1.5px solid #8FD9E8;
+  border-left: 1.5px solid #8FD9E8;
+}
+.blueprint-frame::after {
+  bottom: -1px; right: -1px;
+  border-bottom: 1.5px solid #8FD9E8;
+  border-right: 1.5px solid #8FD9E8;
+}
+.blueprint-frame:hover::before,
+.blueprint-frame:hover::after { opacity: 1; }
+
+.hairline {
+  border-color: rgba(143, 217, 232, 0.18);
+}
+
+/* Frosted panel, used for anything floating over imagery. */
+.glass {
+  background: rgba(11, 31, 53, 0.55);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(143, 217, 232, 0.14);
+}
+
+.card-lift {
+  transition: transform 0.4s var(--ease-out-expo), border-color 0.3s ease,
+              background-color 0.3s ease;
+}
+.card-lift:hover {
+  transform: translateY(-3px);
+  border-color: rgba(242, 166, 90, 0.45);
+}
+
+/* Amber underline that draws in on hover — used on primary CTAs. */
+.btn-primary {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.btn-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,0.45), transparent);
+  transform: translateX(-120%);
+  z-index: -1;
+}
+.btn-primary:hover::after {
+  animation: sheen 0.9s var(--ease-out-expo);
+}
+
+.text-gradient {
+  background: linear-gradient(120deg, #EDEEE7 0%, #EDEEE7 45%, #8FD9E8 75%, #F2A65A 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+::selection {
+  background: #F2A65A;
+  color: #081A2E;
+}
+
+/* Scrollbar tuned to the palette so long tables don't punch a bright hole in
+   the page on Windows. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(143, 217, 232, 0.28) transparent;
+}
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(143, 217, 232, 0.22);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(143, 217, 232, 0.4); }
+
+/* Leaflet dark-mode tuning so the map matches the palette */
+.leaflet-container {
+  background: #071626 !important;
+  font-family: var(--font-mono);
+}
+.leaflet-popup-content-wrapper {
+  background: #163B60;
+  color: #EDEEE7;
+  border: 1px solid rgba(143, 217, 232, 0.3);
+  border-radius: 4px;
+}
+.leaflet-popup-tip { background: #163B60; }
+.leaflet-control-layers,
+.leaflet-bar a {
+  background: rgba(11, 31, 53, 0.9) !important;
+  color: #EDEEE7 !important;
+  border-color: rgba(143, 217, 232, 0.25) !important;
+}
+.leaflet-bar a:hover { background: #163B60 !important; }
+
+/* Place-name labels. Leaflet's default tooltip is a white box with a drop
+   shadow and a pointer — fine for one popup, unreadable as a thousand labels
+   on a dark basemap. These render as bare text with a dark halo instead, the
+   way an atlas prints town names over terrain. */
+.leaflet-tooltip.place-label {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  color: #EDEEE7;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  text-shadow:
+    0 0 3px #071626, 0 0 3px #071626, 0 0 6px #071626;
+  white-space: nowrap;
+}
+.leaflet-tooltip.place-label::before { display: none; }
+
+
+/* Keyboard focus. Several inputs remove the browser outline
+   (focus:outline-none) and rely on a border colour change, and links, buttons
+   and the map controls had no visible focus at all on the dark theme.
+   :focus-visible only triggers for keyboard navigation, so mouse users don't
+   see rings on every click. */
+:focus-visible {
+  outline: 2px solid #F2A65A;
+  outline-offset: 2px;
+}
+input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline-offset: 0;
+}
+/* Respect the OS "reduce motion" setting — the site uses fade/slide entrances. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
