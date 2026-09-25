@@ -1,3 +1,13 @@
+---
+title: SmartCity AI
+emoji: 🏙️
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # SmartCity AI — Intelligent Urban Planning & Traffic Management Platform
 
 A production-style platform for a UAE smart-city evaluation. Twelve modules
