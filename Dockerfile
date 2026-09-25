@@ -6,7 +6,7 @@ FROM python:3.11-slim-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql postgresql-15-postgis-3 redis-server nginx supervisor \
-    libpq-dev gcc gosu \
+    libpq-dev gcc \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=nodesrc /usr/local/bin/node /usr/local/bin/node
@@ -21,8 +21,12 @@ COPY --chown=user backend/requirements.txt backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
 COPY --chown=user frontend frontend
+# The API is served same-origin (nginx routes /api, /ws, /health, /docs to
+# FastAPI). The demo password is baked in so the public demo's one-click
+# sign-in works; it only unlocks the seeded mock-data accounts.
 ARG SPACE_URL=https://elisha622-smartcity-ai.hf.space
-ENV NEXT_PUBLIC_API_URL=${SPACE_URL}/api
+ENV NEXT_PUBLIC_API_URL=${SPACE_URL} \
+    NEXT_PUBLIC_DEMO_PASSWORD=demo
 RUN cd frontend && npm install && npm run build
 
 COPY --chown=user backend/app backend/app

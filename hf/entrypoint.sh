@@ -8,4 +8,8 @@ if [ ! -d "$PGDATA/base" ]; then
   createdb -h /tmp -U postgres -O smartcity smartcity
   pg_ctl -D "$PGDATA" -w stop
 fi
+# The config default JWT secret is public (it's in the repo), so anyone could
+# forge a session against a public Space. Generate one per boot unless a Space
+# secret provides it.
+export SMARTCITY_JWT_SECRET="${SMARTCITY_JWT_SECRET:-$(python -c 'import secrets; print(secrets.token_urlsafe(48))')}"
 exec supervisord -n -c /home/user/app/hf/supervisord.conf
