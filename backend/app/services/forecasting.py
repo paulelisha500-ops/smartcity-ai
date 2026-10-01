@@ -57,7 +57,7 @@ class ForecastingService:
 
     @staticmethod
     def _synthetic_history(intersection_id: int) -> list[dict]:
-        """Fallback so the endpoint is demonstrable with zero DB history."""
+        """Fallback so the endpoint answers before any history has been stored."""
         now = datetime.utcnow()
         history = []
         for days_back in range(1, 15):

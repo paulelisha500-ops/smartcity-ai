@@ -17,7 +17,7 @@
 
 Auth: `POST /api/auth/login` issues a JWT with a `role` claim
 (`admin`, `traffic_officer`, `city_planner`, `maintenance_department`,
-`public_user`). Demo credentials are in `backend/app/routers/auth.py`.
+`public_user`). The built-in role accounts are in `backend/app/routers/auth.py`.
 
 WebSocket: `ws://localhost:8001/ws/live` pushes periodic congestion updates.
 

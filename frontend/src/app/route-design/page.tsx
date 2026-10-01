@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
+import MapView from "@/components/LazyMap";
 import { api, describeError, DesignPreset, RouteDesign } from "@/lib/api";
 
-const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
 
 function scoreTone(score: number) {
   if (score >= 70) return "text-signal-green";

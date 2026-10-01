@@ -1,5 +1,6 @@
-# Hugging Face Space image: the whole stack (Postgres/PostGIS, Redis, FastAPI,
-# Celery, Next.js, nginx) in one container, fronted by nginx on port 7860.
+# Single-container image: the whole stack (Postgres/PostGIS, Redis, FastAPI,
+# Celery, Next.js, nginx) behind nginx on port 7860, for hosts that run one
+# container per app. The hosted edition does not use it — see docs/DEPLOYMENT.md.
 FROM node:20-bookworm-slim AS nodesrc
 
 FROM python:3.11-slim-bookworm
@@ -22,16 +23,16 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 
 COPY --chown=user frontend frontend
 # The API is served same-origin (nginx routes /api, /ws, /health, /docs to
-# FastAPI). The demo password is baked in so the public demo's one-click
-# sign-in works; it only unlocks the seeded mock-data accounts.
-ARG SPACE_URL=https://elisha622-smartcity-ai.hf.space
-ENV NEXT_PUBLIC_API_URL=${SPACE_URL} \
-    NEXT_PUBLIC_DEMO_PASSWORD=demo
+# FastAPI). The account password is baked in so one-click sign-in works for
+# the built-in role accounts.
+ARG PUBLIC_URL=http://localhost:7860
+ENV NEXT_PUBLIC_API_URL=${PUBLIC_URL} \
+    NEXT_PUBLIC_ACCOUNT_PASSWORD=smartcity
 RUN cd frontend && npm install && npm run build
 
 COPY --chown=user backend/app backend/app
-COPY --chown=user hf hf
-RUN chmod +x hf/entrypoint.sh && chown -R user:user /home/user
+COPY --chown=user deploy/container deploy/container
+RUN chmod +x deploy/container/entrypoint.sh && chown -R user:user /home/user
 
 USER user
 ENV SMARTCITY_POSTGRES_URL=postgresql://smartcity:smartcity@127.0.0.1:5432/smartcity \
@@ -39,4 +40,4 @@ ENV SMARTCITY_POSTGRES_URL=postgresql://smartcity:smartcity@127.0.0.1:5432/smart
     SMARTCITY_MODEL_MODE=mock \
     PYTHONUNBUFFERED=1
 EXPOSE 7860
-CMD ["/home/user/app/hf/entrypoint.sh"]
+CMD ["/home/user/app/deploy/container/entrypoint.sh"]

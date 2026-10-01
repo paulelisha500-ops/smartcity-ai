@@ -56,7 +56,7 @@ def resolve_secret(credential_ref: Optional[str]) -> Optional[str]:
     """
     Resolve a camera password from the deployment secret store.
 
-    The POC backend reads environment variables, which is what a container
+    The backend reads environment variables, which is what a container
     orchestrator injects from Vault/Secrets Manager anyway. `credential_ref`
     is the *name*, never the value — so the database can be dumped, shared or
     backed up without leaking camera credentials.

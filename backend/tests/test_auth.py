@@ -25,7 +25,7 @@ def client(monkeypatch):
     return TestClient(app)
 
 
-def _login(c, email="admin@city.gov", pw="demo"):
+def _login(c, email="admin@city.gov", pw="smartcity"):
     return c.post("/api/auth/login", json={"email": email, "password": pw})
 
 
@@ -69,5 +69,5 @@ def test_insecure_defaults_refused_outside_development(monkeypatch):
     with pytest.raises(RuntimeError):
         auth.assert_secure_config()
     monkeypatch.setattr(auth.settings, "jwt_secret", "x" * 40)
-    monkeypatch.setattr(auth.settings, "demo_password", "s3cret-pass")
+    monkeypatch.setattr(auth.settings, "account_password", "s3cret-pass")
     auth.assert_secure_config()

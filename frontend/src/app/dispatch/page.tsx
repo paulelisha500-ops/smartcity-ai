@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
+import MapView from "@/components/LazyMap";
 import { api, describeError, Facility } from "@/lib/api";
 
-const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
 
 // Realistic incident locations for a dispatch drill.
 const INCIDENT_PRESETS = [

@@ -2,6 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
 
+  // The hosted edition (npm run build:static) is exported as plain files and
+  // served with no Node process, so there is no image optimiser to call.
+  ...(process.env.NEXT_PUBLIC_STATIC_API === "1" && {
+    output: "export",
+    images: { unoptimized: true },
+  }),
+
   webpack: (config, { dev }) => {
     // Docker Desktop on Windows shares the source directory through a
     // filesystem that does not deliver inotify events into the Linux

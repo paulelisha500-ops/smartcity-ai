@@ -6,12 +6,11 @@ Production path: YOLOv8 (vehicle detection + classification) + ByteTrack
 footage. Each tracked vehicle contributes to counts, and speed is derived
 from tracked position deltas over known camera calibration.
 
-Mock path (below): deterministic, seeded pseudo-random generator so demo
+Mock path (below): deterministic, seeded pseudo-random generator so the
 data is stable and story-tellable (e.g. "Al Ittihad & 3rd St is consistently
 the worst morning hotspot") rather than random noise on every request.
 """
 import hashlib
-import math
 from datetime import datetime
 
 from app.config import get_settings

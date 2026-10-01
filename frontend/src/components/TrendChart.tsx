@@ -1,6 +1,7 @@
 "use client";
 
 import { Line } from "react-chartjs-2";
+import { CHART_FONT } from "@/lib/chart-font";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -67,14 +68,14 @@ export default function TrendChart({
               color: "#EDEEE7",
               boxWidth: 10,
               boxHeight: 10,
-              font: { family: "IBM Plex Mono", size: 10 },
+              font: { family: CHART_FONT, size: 10 },
             },
           }
         : { display: false },
       tooltip: {
         backgroundColor: "#0F2A47",
-        titleFont: { family: "IBM Plex Mono", size: 10 },
-        bodyFont: { family: "IBM Plex Mono", size: 10 },
+        titleFont: { family: CHART_FONT, size: 10 },
+        bodyFont: { family: CHART_FONT, size: 10 },
         borderColor: "rgba(143,217,232,0.2)",
         borderWidth: 1,
       },
@@ -84,7 +85,7 @@ export default function TrendChart({
         grid: { color: "rgba(143,217,232,0.06)" },
         ticks: {
           color: "#EDEEE7",
-          font: { family: "IBM Plex Mono", size: 9 },
+          font: { family: CHART_FONT, size: 9 },
           maxRotation: 0,
           autoSkip: true,
           maxTicksLimit: 8,
@@ -92,14 +93,14 @@ export default function TrendChart({
       },
       y: {
         grid: { color: "rgba(143,217,232,0.1)" },
-        ticks: { color: "#EDEEE7", font: { family: "IBM Plex Mono", size: 9 } },
+        ticks: { color: "#EDEEE7", font: { family: CHART_FONT, size: 9 } },
       },
       ...(hasRightAxis
         ? {
             y1: {
               position: "right" as const,
               grid: { display: false },
-              ticks: { color: "#EDEEE7", font: { family: "IBM Plex Mono", size: 9 } },
+              ticks: { color: "#EDEEE7", font: { family: CHART_FONT, size: 9 } },
             },
           }
         : {}),

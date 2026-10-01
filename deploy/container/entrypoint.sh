@@ -12,4 +12,4 @@ fi
 # forge a session against a public Space. Generate one per boot unless a Space
 # secret provides it.
 export SMARTCITY_JWT_SECRET="${SMARTCITY_JWT_SECRET:-$(python -c 'import secrets; print(secrets.token_urlsafe(48))')}"
-exec supervisord -n -c /home/user/app/hf/supervisord.conf
+exec supervisord -n -c /home/user/app/deploy/container/supervisord.conf

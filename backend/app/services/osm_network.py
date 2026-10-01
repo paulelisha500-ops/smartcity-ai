@@ -5,7 +5,7 @@ Pulls the actual UAE highway network out of OpenStreetMap through the public
 Overpass API and persists true LINESTRING geometry into PostGIS. After this
 runs, every other module — routing, the digital twin map, corridor design —
 is working against the real road layout of all seven emirates rather than a
-hand-drawn demo graph.
+hand-drawn reference graph.
 
 Why Overpass and not a Geofabrik `.osm.pbf` extract: the PBF for the UAE is
 ~100MB and needs osm2pgsql plus a few hundred MB of RAM to import. Overpass
@@ -219,7 +219,7 @@ class OverpassClient:
                         resp = client.post(
                             endpoint,
                             data={"data": ql},
-                            headers={"User-Agent": "SmartCityAI/1.0 (urban planning POC)"},
+                            headers={"User-Agent": "SmartCityAI/1.0 (urban planning platform)"},
                         )
                     if resp.status_code in (429, 502, 503, 504):
                         last_error = f"{endpoint} -> HTTP {resp.status_code}"
@@ -508,7 +508,7 @@ def ingest_border_crossings(db: Session,
     """
     Load the real border posts on the UAE frontier from OSM, then fill in the
     major named crossings that OSM may not tag, so the corridor list is never
-    empty in a demo.
+    empty.
     """
     bbox = bbox or settings.uae_bbox
     elements = overpass.border_controls(bbox)

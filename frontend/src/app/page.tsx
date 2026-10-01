@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import dynamic from "next/dynamic";
+import MapView from "@/components/LazyMap";
 import {
   api, TrafficReading, RoadDamagePoint, Hotspot, KPIs,
   RoadLinkGeo, BorderCrossingRow, CameraRow, Project,
@@ -11,7 +11,6 @@ import { useLiveSocket, LiveEvent, NewComplaintEvent } from "@/lib/live";
 import KPICard from "@/components/KPICard";
 import CongestionChart from "@/components/CongestionChart";
 
-const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
 
 export default function DashboardPage() {
   const [traffic, setTraffic] = useState<TrafficReading[]>([]);

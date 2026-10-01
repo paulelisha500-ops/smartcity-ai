@@ -1,0 +1,68 @@
+name: Deploy
+
+# Builds the hosted edition from source and publishes it to the Hugging Face
+# Space. Needs one repository secret, HF_TOKEN — a Hugging Face access token
+# with write access to the Space. See docs/DEPLOYMENT.md.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A newer push supersedes a deploy that is still running.
+concurrency:
+  group: deploy-space
+  cancel-in-progress: true
+
+jobs:
+  space:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build the site
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build:static
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Publish to the Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "::warning::HF_TOKEN is not set, so the site was built but not published. Add the secret to enable deploys."
+            exit 0
+          fi
+          pip install --quiet huggingface_hub
+          python scripts/deploy_space.py
+
+      - name: Mirror the source to the Hub
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then exit 0; fi
+          mkdir "$RUNNER_TEMP/source"
+          git archive HEAD | tar -x -C "$RUNNER_TEMP/source"
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+
+          HfApi().upload_folder(
+              folder_path=os.path.join(os.environ["RUNNER_TEMP"], "source"),
+              repo_id=os.environ.get("HF_SOURCE_REPO", "Elisha622/smartcity-ai"),
+              repo_type="model",
+              delete_patterns=["*"],
+              commit_message=f"Sync from GitHub ({os.environ['GITHUB_SHA'][:7]})",
+          )
+          PY

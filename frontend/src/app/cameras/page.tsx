@@ -1,12 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import dynamic from "next/dynamic";
+import MapView from "@/components/LazyMap";
 import { api, describeError, CameraRow, CameraSummary, CameraTestResult } from "@/lib/api";
 import { useLiveSocket } from "@/lib/live";
 import KPICard from "@/components/KPICard";
 
-const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
 
 const STATUS_TONE: Record<string, string> = {
   online: "text-signal-green",
@@ -23,6 +22,7 @@ export default function CamerasPage() {
   const [results, setResults] = useState<Record<number, CameraTestResult>>({});
   const [guideOpen, setGuideOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -51,9 +51,15 @@ export default function CamerasPage() {
 
   async function seed() {
     setBusy("seed");
+    setNote(null);
     try {
-      await api.seedCameraSites();
+      const r = await api.seedCameraSites();
       await load();
+      setNote(
+        r.sites_created > 0
+          ? `Added ${r.sites_created} camera site(s) — ${r.total} in the registry.`
+          : `Every monitored junction already has a site — ${r.total} in the registry.`
+      );
     } catch (e) {
       setError(describeError(e));
     } finally {
@@ -63,9 +69,14 @@ export default function CamerasPage() {
 
   async function sweep() {
     setBusy("sweep");
+    setNote(null);
     try {
-      await api.healthSweep();
+      const r = await api.healthSweep();
       await load();
+      setNote(
+        `Sweep complete — ${r.checked} probed, ${r.online} online, ` +
+        `${r.skipped_unauthorized} skipped (no authorisation on record).`
+      );
     } catch (e) {
       setError(describeError(e));
     } finally {
@@ -116,6 +127,12 @@ export default function CamerasPage() {
       {error && (
         <div role="alert" className="border border-signal-red/40 bg-signal-red/10 text-signal-red text-xs font-mono px-4 py-3">
           {error}
+        </div>
+      )}
+
+      {note && (
+        <div role="status" className="border hairline bg-blueprint-800/40 text-xs font-mono px-4 py-3 text-paper/70">
+          {note}
         </div>
       )}
 

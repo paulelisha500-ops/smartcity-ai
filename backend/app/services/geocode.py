@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Optional
 
 from geoalchemy2.shape import to_shape
-from sqlalchemy import func, or_, text
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.models.place import Place

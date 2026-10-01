@@ -36,12 +36,16 @@ export default function PlaceSearch({
   const [failed, setFailed] = useState(false);
   const seq = useRef(0);
   const boxRef = useRef<HTMLDivElement>(null);
+  // The name just picked. Choosing a result writes it into the box, which
+  // would otherwise count as typing and reopen the list over the map.
+  const chosen = useRef<string | null>(null);
 
   useEffect(() => {
     if (term.trim().length < 2) {
       setResults([]);
       return;
     }
+    if (term === chosen.current) return;
     const mine = ++seq.current;
     const t = setTimeout(async () => {
       setBusy(true);
@@ -73,6 +77,7 @@ export default function PlaceSearch({
 
   function choose(r: PlaceResult) {
     onSelect(r);
+    chosen.current = r.name;
     setTerm(r.name);
     setOpen(false);
   }

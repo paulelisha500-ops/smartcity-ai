@@ -6,14 +6,14 @@ class Settings(BaseSettings):
     """
     Central config. Every AI service checks `model_mode` to decide whether to
     run its mock implementation or call the real model. This is what lets the
-    exact same codebase run as a zero-dependency demo today and a real
-    production system later, just by changing env vars.
+    exact same codebase run with no GPU or API key today and against trained
+    models later, just by changing env vars.
     """
 
     app_name: str = "SmartCity AI"
     environment: str = "development"
 
-    # mock  -> deterministic, demo-safe, no GPU/API key required
+    # mock  -> deterministic modelled outputs, no GPU/API key required
     # production -> real model calls (YOLO, LangChain+LLM, trained forecasters)
     model_mode: str = "mock"
 
@@ -24,9 +24,9 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 8
-    # Password for the built-in demo accounts. The default is only accepted in
+    # Password for the built-in role accounts. The default is only accepted in
     # development; any other environment must set its own (see routers/auth.py).
-    demo_password: str = "demo"
+    account_password: str = "smartcity"
     # Trust X-Forwarded-For for client IPs (set only behind your own proxy).
     trust_proxy_headers: bool = False
     cookie_samesite: str = "lax"

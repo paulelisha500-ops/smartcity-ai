@@ -54,7 +54,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   if (isPublic) {
-    return <main className="min-h-screen">{children}</main>;
+    return (
+      <main key={pathname} className="min-h-screen animate-page">
+        {children}
+      </main>
+    );
   }
 
   // Avoid painting the console for an instant before redirecting away.
@@ -92,7 +96,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </button>
           <span className="font-display text-sm text-paper">SmartCity AI</span>
         </div>
-        <main className="flex-1 min-w-0">{children}</main>
+        <main key={pathname} className="flex-1 min-w-0 animate-page">{children}</main>
       </div>
     </div>
   );

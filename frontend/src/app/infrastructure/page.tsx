@@ -1,12 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import dynamic from "next/dynamic";
+import MapView from "@/components/LazyMap";
 import { api, describeError, Project, ProjectSummary } from "@/lib/api";
 import ErrorBanner from "@/components/ErrorBanner";
 import KPICard from "@/components/KPICard";
 
-const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
 
 const STATUS_TONE: Record<string, string> = {
   completed: "text-signal-green",
@@ -22,6 +21,7 @@ export default function InfrastructurePage() {
   const [filter, setFilter] = useState("all");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -40,9 +40,15 @@ export default function InfrastructurePage() {
 
   async function seed() {
     setBusy(true);
+    setNote(null);
     try {
-      await api.seedProjects();
+      const r = await api.seedProjects();
       await load();
+      setNote(
+        r.projects_inserted > 0
+          ? `Loaded ${r.projects_inserted} project(s) — ${r.total_in_register} in the register.`
+          : `The register is current — ${r.total_in_register} projects on record.`
+      );
     } catch (e) {
       setError(describeError(e));
     } finally {
@@ -71,6 +77,12 @@ export default function InfrastructurePage() {
       </header>
 
       <ErrorBanner message={error} onRetry={load} />
+
+      {note && (
+        <div role="status" className="border hairline bg-blueprint-800/40 text-xs font-mono px-4 py-3 text-paper/70">
+          {note}
+        </div>
+      )}
 
       <section className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <KPICard code="M11.1" label="Projects" value={summary?.total_projects ?? "—"} />
