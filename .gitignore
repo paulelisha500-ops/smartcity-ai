@@ -6,3 +6,15 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# Frontend build output and generated files
+frontend/out/
+frontend/tsconfig.tsbuildinfo
+frontend/next-env.d.ts
+
+# The published data set (scripts/snapshot_static.py writes it; it is uploaded
+# to the Hugging Face Space, not kept in git)
+frontend/public/data/
+
+# Local tooling
+.claude/

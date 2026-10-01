@@ -27,8 +27,22 @@ class Fact:
     tags: set[str]
 
 
+def _matches(word: str, tags: set[str]) -> bool:
+    """
+    A question word matches a tag when one is the start of the other, so
+    "roads" finds "road" and "widened" finds "widen". Exact matching missed
+    both — the suggested question "Which roads should be widened?" retrieved
+    nothing. Four letters minimum, or short words would match almost anything.
+    """
+    return any(
+        word == tag
+        or (min(len(word), len(tag)) >= 4 and (word.startswith(tag) or tag.startswith(word)))
+        for tag in tags
+    )
+
+
 def _score(query_tokens: set[str], fact: Fact) -> int:
-    return len(query_tokens & fact.tags)
+    return sum(1 for token in query_tokens if _matches(token, fact.tags))
 
 
 class RAGPlannerService:
@@ -59,8 +73,7 @@ class RAGPlannerService:
         summary = " ".join(f.text for f in used)
         answer = (
             f"Based on current city data: {summary} "
-            f"This reflects {len(used)} data point(s) retrieved for your question; "
-            f"in production this is grounded with live SQL/spatial queries and cites exact rows."
+            f"This answer draws on {len(used)} data point(s) retrieved for your question."
         )
         return {"answer": answer, "sources_used": [f.text for f in used]}
 

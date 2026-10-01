@@ -42,7 +42,7 @@ export default function AboutPage() {
 
       <section className="relative border-b hairline overflow-hidden">
         <div className="absolute inset-0">
-          <Image src="/emirates/sharjah.jpg" alt="Sharjah corniche" fill className="object-cover" />
+          <Image src="/emirates/sharjah.webp" alt="Sharjah corniche" fill className="object-cover" />
           <div className="absolute inset-0 bg-gradient-to-r from-blueprint-950 via-blueprint-950/90 to-blueprint-950/45" />
           <div className="absolute inset-0 grid-bg opacity-50" />
         </div>
@@ -64,7 +64,7 @@ export default function AboutPage() {
       <section className="max-w-6xl mx-auto px-6 py-20">
         <SectionHead
           eyebrow="Approach"
-          title="Built to be checked, not just demonstrated"
+          title="Built to be checked, not just shown"
           lede="A planning tool is only useful if an analyst can verify what it tells them. That constraint shaped the whole system."
         />
         <div className="grid md:grid-cols-2 gap-4 mt-12">

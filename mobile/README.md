@@ -1,6 +1,6 @@
 # Mobile App (Flutter) — Scope
 
-Phase 2 of the rollout (see `docs/ROADMAP.md`). Not built out in this POC pass
+Phase 2 of the rollout (see `docs/ROADMAP.md`). Not built out yet
 because the highest-value thing to prove first is the backend/AI architecture
 and the planner/analyst-facing dashboard. Scope for when this is built:
 

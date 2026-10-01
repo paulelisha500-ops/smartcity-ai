@@ -1,13 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import dynamic from "next/dynamic";
+import MapView from "@/components/LazyMap";
 import { api, describeError, BorderCrossingRow, NetworkStatus, RoadLinkGeo, PlacesStatus, PlaceResult } from "@/lib/api";
 import KPICard from "@/components/KPICard";
 import PlaceSearch from "@/components/PlaceSearch";
 import type { PlaceMarker } from "@/components/MapView";
 
-const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
 
 const CLASS_FILTERS = [
   { label: "Motorways", value: "motorway" },
@@ -94,7 +93,17 @@ export default function NetworkPage() {
     setImporting(emirate);
     setNote(`Importing places, buildings and streets for ${emirate}… this runs in the background.`);
     try {
-      await Promise.all([api.ingestPlaces(emirate), api.ingestStreets(emirate)]);
+      const [started] = await Promise.all([api.ingestPlaces(emirate), api.ingestStreets(emirate)]);
+      if (started?.status === "up_to_date") {
+        // Nothing to fetch: the published data set already carries this emirate.
+        const [, s] = await Promise.all([loadPlaces(), loadStatus()]);
+        const links = s?.by_emirate?.[emirate];
+        setNote(
+          `${emirate} is up to date` +
+          (links ? ` — ${links.toLocaleString()} road links on record.` : ".")
+        );
+        return;
+      }
       setNote(`${emirate} import started. Counts update as data lands.`);
       const poll = setInterval(async () => {
         await Promise.all([loadPlaces(), loadStatus()]);
@@ -111,11 +120,12 @@ export default function NetworkPage() {
     setBusy(true);
     setNote("Downloading the UAE highway network from OpenStreetMap — this takes 30–90s…");
     try {
-      await api.ingestNetwork(true); // inline so we know when it's actually done
+      const result = await api.ingestNetwork(true); // inline so we know when it's actually done
       const s = await loadStatus();
       if (s?.ingested) {
         await loadGeo();
-        setNote(`Loaded ${s.road_links.toLocaleString()} links · ${s.network_km.toLocaleString()} km.`);
+        const size = `${s.road_links.toLocaleString()} links · ${s.network_km.toLocaleString()} km`;
+        setNote(result?.status === "up_to_date" ? `The network is up to date — ${size}.` : `Loaded ${size}.`);
       }
     } catch (e) {
       setNote(`Ingest failed: ${describeError(e)}`);

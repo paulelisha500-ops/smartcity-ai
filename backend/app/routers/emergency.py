@@ -2,7 +2,7 @@
 M7 — Emergency routing.
 
 Routes over the **real** UAE road network once M10 has ingested it, and falls
-back to the original small demo graph when it hasn't, so the endpoint is never
+back to a small reference graph when it hasn't, so the endpoint is never
 dead. Emergency runs apply a blue-light factor and ignore tolls: an ambulance
 does not detour around a Salik gate.
 """
@@ -41,7 +41,7 @@ FACILITIES = [
 ]
 
 
-def _demo_graph() -> RoadGraph:
+def _reference_graph() -> RoadGraph:
     """
     Static fallback graph, used only before the real network is ingested.
     Kept so the endpoint degrades gracefully rather than erroring.
@@ -84,10 +84,10 @@ def facilities(facility_type: str | None = None, emirate: str | None = None):
 
 @router.post("/route")
 def emergency_route(payload: RouteRequest, _user=Depends(require_any(*OPERATORS))):
-    """Legacy named-node routing over the demo graph."""
-    graph = _demo_graph()
+    """Legacy named-node routing over the reference graph."""
+    graph = _reference_graph()
     result = emergency_routing_service.shortest_path(graph, payload.start, payload.end)
-    return {**result, "vehicle_type": payload.vehicle_type, "network": "demo_graph"}
+    return {**result, "vehicle_type": payload.vehicle_type, "network": "reference_graph"}
 
 
 @router.post("/route-geo")
@@ -173,5 +173,5 @@ def nearest_facility(lat: float = Query(..., ge=-90, le=90), lon: float = Query(
 
 @router.get("/graph-nodes")
 def graph_nodes():
-    """Demo-graph node names (legacy endpoint)."""
+    """Reference-graph node names (legacy endpoint)."""
     return ["station_A", "junction_1", "junction_2", "hospital"]

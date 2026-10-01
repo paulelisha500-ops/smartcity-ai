@@ -34,7 +34,7 @@ result. Routers never call models directly — they call the service, and the
 service decides whether to run the mock path or the real model path based on
 config (`SMARTCITY_MODEL_MODE=mock|production`). This means:
 
-1. The POC runs everywhere (no GPU/API key required).
+1. The platform runs everywhere (no GPU/API key required).
 2. Swapping in a trained YOLO checkpoint or a hosted LLM is a config change and
    an implementation of one method, not a rewrite.
 3. Every service is independently testable and independently scalable (CV
@@ -55,7 +55,7 @@ Traffic officers and planners need live state, not just request/response. The
 Five roles (Admin, Traffic Officer, City Planner, Maintenance Department,
 Public User) are modeled as a single `role` claim on the JWT. Route-level
 dependencies (`require_role(...)`) gate access; this is intentionally simple
-for the POC and maps directly onto a production RBAC/SSO integration (e.g.
+and maps directly onto an RBAC/SSO integration (e.g.
 government SSO via SAML) later.
 
 ## Geospatial data model (simplified)

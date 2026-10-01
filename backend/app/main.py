@@ -24,7 +24,7 @@ settings = get_settings()
 
 app = FastAPI(
     title=settings.app_name,
-    description="Intelligent Urban Planning & Traffic Management Platform — POC API",
+    description="Intelligent Urban Planning & Traffic Management Platform — API",
     version="0.1.0",
 )
 

@@ -3,15 +3,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import BrandMark from "@/components/BrandMark";
 import { saveSession, homeRouteForRole, ROLE_LABELS } from "@/lib/auth";
 
-// One-click sign-in for the seeded demo accounts. Baked in only for
+// One-click sign-in for the built-in role accounts. Baked in only for
 // development builds (or when explicitly configured); a production build
 // ships no default password.
-const DEMO_PASSWORD =
-  process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? (process.env.NODE_ENV === "production" ? "" : "demo");
+const ACCOUNT_PASSWORD =
+  process.env.NEXT_PUBLIC_ACCOUNT_PASSWORD ?? (process.env.NODE_ENV === "production" ? "" : "smartcity");
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
 // Accounts defined in backend/app/routers/auth.py. The quick-select panel
@@ -32,18 +32,33 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Fetch what the console opens with while the user is still signing in, so
+  // the first screen after login paints from cache.
+  useEffect(() => {
+    const warm = () => {
+      import("@/components/MapView");
+      if (process.env.NEXT_PUBLIC_STATIC_API === "1") {
+        import("@/lib/static-api").then((m) => m.warm());
+      }
+    };
+    const timer = window.setTimeout(warm, 400);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`${API_URL}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Requested-With": "smartcity-console" },
-        credentials: "include",
-        body: JSON.stringify({ email, password }),
-        signal: AbortSignal.timeout(15_000),
-      });
+      const res = process.env.NEXT_PUBLIC_STATIC_API === "1"
+        ? (await import("@/lib/static-api")).staticLogin(email, password)
+        : await fetch(`${API_URL}/api/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Requested-With": "smartcity-console" },
+            credentials: "include",
+            body: JSON.stringify({ email, password }),
+            signal: AbortSignal.timeout(15_000),
+          });
       if (res.status === 401) {
         setError("Invalid credentials. Check the email and password.");
         return;
@@ -74,7 +89,7 @@ export default function LoginPage() {
       {/* ------------------------------------------------ imagery panel */}
       <div className="relative hidden lg:block border-r hairline">
         <Image
-          src="/emirates/abu-dhabi.jpg"
+          src="/emirates/abu-dhabi.webp"
           alt="Abu Dhabi city"
           fill
           priority
@@ -150,7 +165,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
-                  placeholder={DEMO_PASSWORD ? "demo account password" : "password"}
+                  placeholder={ACCOUNT_PASSWORD ? "account password" : "password"}
                   className="w-full bg-blueprint-800/60 border hairline rounded-md px-3.5 py-3 text-sm font-mono text-paper placeholder:text-paper/25 transition-all duration-300 focus:outline-none focus:border-signal-amber focus:bg-blueprint-800 focus:ring-2 focus:ring-signal-amber/15"
                 />
               </div>
@@ -181,7 +196,7 @@ export default function LoginPage() {
                     type="button"
                     onClick={() => {
                       setEmail(a.email);
-                      setPassword(DEMO_PASSWORD);
+                      setPassword(ACCOUNT_PASSWORD);
                       setError(null);
                     }}
                     className="group w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-blueprint-800/60 transition-colors duration-200"

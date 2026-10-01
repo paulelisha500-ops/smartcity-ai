@@ -23,6 +23,9 @@ export default function ComplaintForm({
 }) {
   const [text, setText] = useState("");
   const [location, setLocation] = useState<PlaceResult | null>(null);
+  // Bumped after each submission so the location box remounts empty; it keeps
+  // its own text, which clearing `location` alone does not reset.
+  const [formRound, setFormRound] = useState(0);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Complaint | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +44,7 @@ export default function ComplaintForm({
       setResult(complaint);
       setText("");
       setLocation(null);
+      setFormRound((n) => n + 1);
       onSubmitted?.(complaint);
     } catch (err) {
       setError(describeError(err, "Could not submit your report. Please try again."));
@@ -68,6 +72,7 @@ export default function ComplaintForm({
         {showLocationPicker && (
           <div>
             <PlaceSearch
+              key={formRound}
               placeholder="Optional — pin the exact location…"
               onSelect={setLocation}
             />

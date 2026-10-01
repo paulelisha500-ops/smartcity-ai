@@ -95,14 +95,21 @@ async function request<T>(path: string, options?: RequestInit & { timeoutMs?: nu
 
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, {
-      ...init,
-      credentials: "include",
-      headers: { ...headers, ...(init.headers as Record<string, string> | undefined) },
-      // Without a timeout a stalled connection leaves the UI on "loading…"
-      // forever, and the caller's `finally` never runs.
-      signal: init.signal ?? AbortSignal.timeout(timeoutMs),
-    });
+    if (process.env.NEXT_PUBLIC_STATIC_API === "1") {
+      // Hosted edition: there is no API server, so the request is answered
+      // from the published data set (see lib/static-api.ts).
+      const { staticFetch } = await import("@/lib/static-api");
+      res = await staticFetch(path, init);
+    } else {
+      res = await fetch(`${API_URL}${path}`, {
+        ...init,
+        credentials: "include",
+        headers: { ...headers, ...(init.headers as Record<string, string> | undefined) },
+        // Without a timeout a stalled connection leaves the UI on "loading…"
+        // forever, and the caller's `finally` never runs.
+        signal: init.signal ?? AbortSignal.timeout(timeoutMs),
+      });
+    }
   } catch (e) {
     const timedOut = e instanceof DOMException && (e.name === "TimeoutError" || e.name === "AbortError");
     throw new ApiNetworkError(path, timedOut);

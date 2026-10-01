@@ -22,7 +22,7 @@ class Intersection(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     geom = Column(Geometry("POINT", srid=4326), nullable=False)
-    has_signal = Column(Integer, default=1)  # 1/0 (kept simple for POC)
+    has_signal = Column(Integer, default=1)  # 1/0
 
 
 class TrafficReading(Base):

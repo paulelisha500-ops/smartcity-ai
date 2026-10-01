@@ -51,6 +51,22 @@ export function useLiveSocket(onEvent: (event: LiveEvent) => void) {
   handlerRef.current = onEvent;
 
   useEffect(() => {
+    if (process.env.NEXT_PUBLIC_STATIC_API === "1") {
+      // Hosted edition: no socket to open — the same events come from the
+      // static data layer.
+      let stopped = false;
+      let unsubscribe = () => {};
+      import("@/lib/static-api").then(({ subscribeLive }) => {
+        if (stopped) return;
+        unsubscribe = subscribeLive((event) => handlerRef.current(event));
+        setConnected(true);
+      });
+      return () => {
+        stopped = true;
+        unsubscribe();
+      };
+    }
+
     let socket: WebSocket | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let backoffMs = 1000;

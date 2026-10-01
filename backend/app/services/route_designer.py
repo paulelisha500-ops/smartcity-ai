@@ -27,7 +27,6 @@ Everything returned is an option-screening estimate, not a design.
 from __future__ import annotations
 
 import json
-import math
 from typing import Optional
 
 from geoalchemy2.shape import to_shape

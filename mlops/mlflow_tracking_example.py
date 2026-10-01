@@ -2,7 +2,7 @@
 Reference pattern for training scripts once real models replace the mock
 services (e.g. training a complaint classifier on accumulated labeled data,
 or a TFT forecaster on historical traffic readings). Not wired to a live
-MLflow server in the POC — this is the convention to follow when one exists.
+MLflow server yet — this is the convention to follow when one exists.
 """
 import mlflow
 

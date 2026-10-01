@@ -25,14 +25,15 @@ def _assemble_facts() -> list[Fact]:
         facts.append(Fact(
             text=f"{h['intersection_name']} currently has the #{h['rank']} highest congestion score "
                  f"in the city at {h['congestion_score']}/100.",
-            tags={"congestion", "traffic", "hotspot", "intersection", "widen", "busiest", "junction", "junctions"},
+            tags={"congestion", "congested", "traffic", "hotspot", "intersection", "widen",
+                  "busy", "busiest", "junction", "jam"},
         ))
 
     for d in maintenance_priority(limit=5):
         facts.append(Fact(
             text=f"{d['name']} has a detected {d['damage_type'].replace('_', ' ')} "
                  f"with severity {d['severity']} (confidence {d['confidence']}).",
-            tags={"maintenance", "road", "damage", "pothole", "repair", "condition"},
+            tags={"maintenance", "maintain", "road", "damage", "pothole", "repair", "condition", "crack"},
         ))
 
     return facts

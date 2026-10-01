@@ -84,7 +84,7 @@ services:
       - ./frontend/tsconfig.json:/app/tsconfig.json
 
   # MongoDB is in the architecture for raw CV frame metadata and LLM logs, but
-  # no code path uses it yet. Kept out of the default stack so the POC fits on
+  # no code path uses it yet. Kept out of the default stack so it fits on
   # a laptop; start it with:  docker compose --profile full up -d
   mongo:
     image: mongo:7

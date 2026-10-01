@@ -91,7 +91,64 @@ h1, h2, h3, .font-display {
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .reveal { opacity: 1; transform: none; transition: none; }
-  .animate-fade-up, .animate-fade-in, .animate-slide-in { animation: none; }
+  .animate-fade-up, .animate-fade-in, .animate-slide-in, .animate-page, .map-loading { animation: none; }
+}
+
+/* ----------------------------------------------------------- interaction */
+/*
+  One motion language for every control: respond at once, settle gently.
+  Declared in the base layer so any utility class on an element still wins.
+*/
+@layer base {
+  button, a, input, textarea, select {
+    transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+    transition-duration: 0.22s;
+    transition-timing-function: var(--ease-out-expo);
+  }
+
+  button, input, textarea, select {
+    border-radius: 8px;
+  }
+
+  /* A control should feel pressed, not merely change colour. */
+  button:active:not(:disabled) {
+    transform: scale(0.97);
+    transition-duration: 0.08s;
+  }
+  button:disabled { cursor: not-allowed; }
+
+  /* Fields answer focus with a soft ring rather than a hard border jump. */
+  input:focus, textarea:focus, select:focus {
+    box-shadow: 0 0 0 3px rgba(242, 166, 90, 0.16);
+  }
+
+  tbody tr { transition: background-color 0.2s ease; }
+  tbody tr:hover { background-color: rgba(143, 217, 232, 0.045); }
+}
+
+/* Each page eases in on navigation, so moving through the console reads as
+   one continuous surface instead of a hard cut. Opacity and a few pixels of
+   travel only — both stay on the compositor. */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.animate-page { animation: page-in 0.5s var(--ease-out-expo) both; }
+
+/* Status and alert banners arrive rather than pop. */
+[role="status"], [role="alert"] { animation: fade-up 0.45s var(--ease-out-expo) both; }
+
+/* Placeholder for a map that is still loading: holds the space with a slow
+   sheen so the panel never reads as broken. */
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+.map-loading {
+  background:
+    linear-gradient(110deg, transparent 35%, rgba(143, 217, 232, 0.07) 50%, transparent 65%) #071626;
+  background-size: 200% 100%;
+  animation: shimmer 1.8s linear infinite;
 }
 
 /* ------------------------------------------------------------ components */
@@ -207,6 +264,8 @@ h1, h2, h3, .font-display {
   border-color: rgba(143, 217, 232, 0.25) !important;
 }
 .leaflet-bar a:hover { background: #163B60 !important; }
+.leaflet-bar, .leaflet-control-layers { border-radius: 10px !important; overflow: hidden; }
+.leaflet-popup-content-wrapper { border-radius: 10px; }
 
 /* Place-name labels. Leaflet's default tooltip is a white box with a drop
    shadow and a pointer — fine for one popup, unreadable as a thousand labels

@@ -29,7 +29,7 @@ const PROOF = [
   {
     k: "Real geometry",
     t: "Routing on the roads that exist",
-    d: "A* over true OpenStreetMap geometry, costed by travel time so congestion changes the answer — not a demo graph.",
+    d: "A* over true OpenStreetMap geometry, costed by travel time so congestion changes the answer — on the roads that actually exist.",
   },
   {
     k: "Real protocols",
@@ -59,7 +59,7 @@ export default function WelcomePage() {
       {/* ---------------------------------------------------------- hero */}
       <section className="relative min-h-[92vh] flex items-center border-b hairline">
         <div className="absolute inset-0">
-          <Image src="/emirates/dubai.jpg" alt="Dubai skyline" fill priority className="object-cover scale-105" />
+          <Image src="/emirates/dubai.webp" alt="Dubai skyline" fill priority className="object-cover scale-105" />
           <div className="absolute inset-0 bg-gradient-to-r from-blueprint-950 via-blueprint-950/92 to-blueprint-950/35" />
           <div className="absolute inset-0 bg-gradient-to-t from-blueprint-950 via-transparent to-blueprint-950/60" />
           <div className="absolute inset-0 grid-bg opacity-60" />

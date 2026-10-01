@@ -13,6 +13,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
+        {process.env.NEXT_PUBLIC_STATIC_API === "1" && (
+          // The static host answers "/" with a redirect to /index.html, which
+          // is not a route. Restore the real path before the router reads it.
+          <script
+            dangerouslySetInnerHTML={{
+              __html:
+                'if(location.pathname.endsWith("/index.html"))' +
+                'history.replaceState(null,"",location.pathname.slice(0,-10)+location.search+location.hash)',
+            }}
+          />
+        )}
         {/*
           Geist is loaded from Google Fonts with a plain <link> rather than
           next/font. next/font validates family names against a list baked into

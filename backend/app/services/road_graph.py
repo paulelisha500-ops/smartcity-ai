@@ -1,7 +1,7 @@
 """
 M7 (upgraded) — routing over the real UAE road network.
 
-The original POC routed over a five-node demo graph. This module builds a
+Routing originally ran over a five-node reference graph. This module builds a
 routable graph from the actual OSM `road_link` geometry in PostGIS and runs
 A* across it, so an ambulance route is computed on the roads that exist.
 
@@ -20,7 +20,6 @@ scores written by M1 feed straight into the effective speed.
 from __future__ import annotations
 
 import heapq
-import math
 import threading
 from dataclasses import dataclass
 from typing import Optional

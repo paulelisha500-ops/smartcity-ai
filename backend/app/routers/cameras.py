@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.camera import Camera
-from app.routers.auth import get_current_user, require_any, ANY_STAFF, OPERATORS
+from app.routers.auth import require_any, ANY_STAFF, OPERATORS
 from app.services.camera_link import camera_connector, resolve_secret, apply_probe_result, sweep_fleet
 
 router = APIRouter(prefix="/api/cameras", tags=["cameras"])

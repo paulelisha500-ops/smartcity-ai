@@ -1,24 +1,17 @@
----
-title: SmartCity AI
-emoji: 🏙️
-colorFrom: blue
-colorTo: green
-sdk: docker
-app_port: 7860
-pinned: false
----
-
 # SmartCity AI — Intelligent Urban Planning & Traffic Management Platform
 
-A production-style platform for a UAE smart-city evaluation. Twelve modules
+An urban-planning and traffic-management platform for UAE cities. Twelve modules
 covering traffic analysis, citizen services, emergency response, and long-range
 infrastructure planning — running on the **real UAE road network**, with a
 **real CCTV integration layer**, on a laptop, with no GPU and no paid API keys.
 
+**Live:** <https://elisha622-smartcity-ai.static.hf.space> — the hosted edition,
+published to a Hugging Face Space by GitHub Actions on every push to `main`.
+Sign in from the welcome page with any of the role accounts.
+
 ## What is actually real here
 
-This started as a POC skeleton with mock services behind clean interfaces.
-Several of those interfaces now have genuine implementations:
+The platform runs on real data and real implementations:
 
 | Area | What it does for real |
 |---|---|
@@ -32,16 +25,17 @@ Several of those interfaces now have genuine implementations:
 | **Complaint NLP** | Rule-based classification, sentiment, location extraction, priority and routing — no GPU, genuinely usable at small-city volume |
 | **Corridor design** | Detour analysis and gap detection against the real network, cross-checked against projects already funded |
 
-Still mock (behind real interfaces, clearly marked): vehicle counts from
-computer vision, road-damage detection, and LLM synthesis in the planner.
-These need a GPU or a paid API and are wired for a one-method swap.
+Modelled rather than measured (behind the same interfaces a trained model
+plugs into): vehicle counts from computer vision, road-damage detection, and
+LLM synthesis in the planner. These need a GPU or a paid API and are wired for
+a one-method swap.
 
 ## The twelve modules
 
 | # | Module | Page | Status |
 |---|--------|------|--------|
-| 1 | Smart Traffic Analysis (CV) | `/traffic` | Mock inference; real YOLO+ByteTrack interface |
-| 2 | Road Damage Detection | `/maintenance` | Mock inference; real YOLO+SegFormer interface |
+| 1 | Smart Traffic Analysis (CV) | `/traffic` | Modelled inference; YOLO+ByteTrack interface |
+| 2 | Road Damage Detection | `/maintenance` | Modelled inference; YOLO+SegFormer interface |
 | 3 | Citizen Complaint Analysis (NLP) | `/complaints` | **Real** |
 | 4 | Smart Traffic Prediction | `/traffic` | **Real** seasonal baseline; TFT/LSTM interface |
 | 5 | AI City Planner (RAG) | `/planner` | **Real** grounded retrieval; LLM synthesis is the swap point |
@@ -134,7 +128,9 @@ Citizen reports ┘                          │
                           AI services (CV, NLP, forecasting, RAG, routing)
 ```
 
-See `docs/ARCHITECTURE.md`, `docs/MODULES.md` and `docs/ROADMAP.md`.
+See `docs/ARCHITECTURE.md`, `docs/MODULES.md`, `docs/ROADMAP.md`, and
+`docs/DEPLOYMENT.md` for how the hosted edition, the compose stack and the
+single-container image relate.
 
 ## Notes on estimates
 
@@ -160,7 +156,7 @@ roughly 1 km and are superseded by OSM data wherever it exists.
   outside development); the browser never holds the token in JavaScript-readable
   storage. Cookie-authenticated writes must send `X-Requested-With` (CSRF guard);
   `Authorization: Bearer` still works for scripts. `POST /api/auth/logout` clears it.
-- **Credentials.** Demo accounts share one password from `SMARTCITY_DEMO_PASSWORD`,
+- **Credentials.** The built-in role accounts share one password from `SMARTCITY_ACCOUNT_PASSWORD`,
   held only as a salted scrypt hash. With `SMARTCITY_ENVIRONMENT` other than
   `development`, the API refuses to start on the default JWT secret/password.
 - **Rate limits** (per client IP, Redis, fail-open): login 10/min, complaint

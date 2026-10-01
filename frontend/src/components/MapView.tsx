@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MapContainer, TileLayer, CircleMarker, Polyline, Popup, Tooltip, LayersControl, useMap } from "react-leaflet";
+import {
+  MapContainer, TileLayer, CircleMarker, Polyline, Popup, Tooltip, LayersControl, LayerGroup, useMap,
+} from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { api } from "@/lib/api";
@@ -70,6 +72,22 @@ function FocusFlyTo({ focus, zoom }: { focus?: { lat: number; lon: number }; zoo
   useEffect(() => {
     if (focus) map.flyTo([focus.lat, focus.lon], zoom, { duration: 0.9 });
   }, [focus?.lat, focus?.lon, zoom, map]);
+  return null;
+}
+
+/**
+ * Leaflet finishes a zoom on a timer. Leave the page mid-zoom and the timer
+ * fires against a map whose panes are already gone, throwing from inside
+ * Leaflet. Clearing the flag that timer checks first makes it a no-op.
+ *
+ * Only the flag: by the time this cleanup runs MapContainer has already
+ * removed the map, so calling any map method here would throw the same way.
+ */
+function SettleOnUnmount() {
+  const map = useMap();
+  useEffect(() => () => {
+    (map as unknown as { _animatingZoom: boolean })._animatingZoom = false;
+  }, [map]);
   return null;
 }
 
@@ -291,14 +309,22 @@ export default function MapView({
         zIndex={2}
       />
 
+      <SettleOnUnmount />
+
       {/* Drawn before the LayersControl overlays so arterials sit on top. */}
       {detailStreets && <DetailStreets />}
       {detailStreets && <ClickToIdentify />}
 
+      {/*
+        Each overlay's markers sit in one LayerGroup. Placed directly under
+        LayersControl.Overlay, every marker registers as its own entry in the
+        control, which rebuilds its whole list per entry — quadratic, and with
+        the real network (thousands of features) it locks the page.
+      */}
       <LayersControl position="topright">
         {places.length > 0 && (
           <LayersControl.Overlay checked name={`Place names (${places.length})`}>
-            <>
+            <LayerGroup>
               {places.map((p) => {
                 // Settlements with real weight get a permanent label so the map
                 // reads like an atlas at country zoom; everything else labels on
@@ -334,13 +360,13 @@ export default function MapView({
                   </CircleMarker>
                 );
               })}
-            </>
+            </LayerGroup>
           </LayersControl.Overlay>
         )}
 
         {roads.length > 0 && (
           <LayersControl.Overlay checked name={`Road network (${roads.length})`}>
-            <>
+            <LayerGroup>
               {roads.map((link) => (
                 <Polyline
                   key={`road-${link.id}`}
@@ -365,13 +391,13 @@ export default function MapView({
                   </Popup>
                 </Polyline>
               ))}
-            </>
+            </LayerGroup>
           </LayersControl.Overlay>
         )}
 
         {traffic.length > 0 && (
           <LayersControl.Overlay checked name={`Traffic (${traffic.length})`}>
-            <>
+            <LayerGroup>
               {traffic.map((t) => (
                 <CircleMarker
                   key={`traffic-${t.intersection_id}`}
@@ -395,13 +421,13 @@ export default function MapView({
                   </Popup>
                 </CircleMarker>
               ))}
-            </>
+            </LayerGroup>
           </LayersControl.Overlay>
         )}
 
         {cameras.length > 0 && (
           <LayersControl.Overlay checked name={`CCTV (${cameras.length})`}>
-            <>
+            <LayerGroup>
               {cameras
                 .filter((c) => c.lat !== null && c.lon !== null)
                 .map((c) => (
@@ -429,13 +455,13 @@ export default function MapView({
                     </Popup>
                   </CircleMarker>
                 ))}
-            </>
+            </LayerGroup>
           </LayersControl.Overlay>
         )}
 
         {borders.length > 0 && (
           <LayersControl.Overlay checked name={`Border crossings (${borders.length})`}>
-            <>
+            <LayerGroup>
               {borders.map((b) => (
                 <CircleMarker
                   key={`border-${b.id}`}
@@ -457,13 +483,13 @@ export default function MapView({
                   </Popup>
                 </CircleMarker>
               ))}
-            </>
+            </LayerGroup>
           </LayersControl.Overlay>
         )}
 
         {projects.length > 0 && (
           <LayersControl.Overlay checked name={`Projects (${projects.length})`}>
-            <>
+            <LayerGroup>
               {projects
                 .filter((p) => p.lat !== null && p.lon !== null)
                 .map((p) => (
@@ -491,13 +517,13 @@ export default function MapView({
                     </Popup>
                   </CircleMarker>
                 ))}
-            </>
+            </LayerGroup>
           </LayersControl.Overlay>
         )}
 
         {roadDamage.length > 0 && (
           <LayersControl.Overlay checked name={`Road damage (${roadDamage.length})`}>
-            <>
+            <LayerGroup>
               {roadDamage.map((d, i) => (
                 <CircleMarker
                   key={`damage-${d.id}-${i}`}
@@ -517,7 +543,7 @@ export default function MapView({
                   </Popup>
                 </CircleMarker>
               ))}
-            </>
+            </LayerGroup>
           </LayersControl.Overlay>
         )}
       </LayersControl>

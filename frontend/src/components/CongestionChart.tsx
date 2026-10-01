@@ -9,6 +9,7 @@ import {
   Tooltip,
 } from "chart.js";
 import type { Hotspot } from "@/lib/api";
+import { CHART_FONT } from "@/lib/chart-font";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip);
 
@@ -38,11 +39,11 @@ export default function CongestionChart({ hotspots }: { hotspots: Hotspot[] }) {
         min: 0,
         max: 100,
         grid: { color: "rgba(143,217,232,0.1)" },
-        ticks: { color: "#EDEEE7", font: { family: "IBM Plex Mono", size: 10 } },
+        ticks: { color: "#EDEEE7", font: { family: CHART_FONT, size: 10 } },
       },
       y: {
         grid: { display: false },
-        ticks: { color: "#EDEEE7", font: { family: "IBM Plex Mono", size: 10 } },
+        ticks: { color: "#EDEEE7", font: { family: CHART_FONT, size: 10 } },
       },
     },
   };

@@ -11,6 +11,12 @@
  */
 const USER_KEY = "smartcity.user";
 
+// The hosted edition is usually viewed embedded in another site's page, where
+// a browser may refuse it storage. It holds no server session to lose, so the
+// display state can live in memory for the visit instead.
+const MEMORY_FALLBACK = process.env.NEXT_PUBLIC_STATIC_API === "1";
+let memorySession: string | null = null;
+
 export interface Session {
   email: string;
   role: string;
@@ -24,16 +30,22 @@ export interface Session {
 export function saveSession(email: string, role: string, expiresAt: number): boolean {
   try {
     const value = JSON.stringify({ email, role, exp: expiresAt });
+    if (MEMORY_FALLBACK) memorySession = value;
     localStorage.setItem(USER_KEY, value);
     return localStorage.getItem(USER_KEY) === value;
   } catch {
-    return false;
+    return MEMORY_FALLBACK;
   }
 }
 
 export function getSession(): Session | null {
   try {
-    const raw = localStorage.getItem(USER_KEY);
+    let raw = memorySession;
+    try {
+      raw = localStorage.getItem(USER_KEY) ?? raw;
+    } catch {
+      /* storage blocked — fall through to the in-memory copy, if any */
+    }
     if (!raw) return null;
     const user = JSON.parse(raw);
     // Mirror the cookie's expiry so the shell doesn't render a console whose
@@ -49,6 +61,7 @@ export function getSession(): Session | null {
 }
 
 export function clearSession() {
+  memorySession = null;
   try {
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem("smartcity.token"); // left by older builds
@@ -72,7 +85,7 @@ export const ROLE_LABELS: Record<string, string> = {
  * every console endpoint that isn't public civic data (camera fleet,
  * complaint list, ingestion, dispatch) is gated to staff roles on the
  * backend, so a citizen who somehow reached the console would just watch
- * requests fail. The account exists to demonstrate the citizen path, so it
+ * requests fail. The account exists to show the citizen path, so it
  * lands there directly: /report, the same page reachable with no login at
  * all.
  */
