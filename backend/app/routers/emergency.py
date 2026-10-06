@@ -111,6 +111,9 @@ def facility_register(db: Session, facility_type: str | None = None) -> list[dic
                     "lat": point.y, "lon": point.x, "emirate": place.emirate,
                 })
     except SQLAlchemyError:
+        # Postgres aborts the transaction on a failed statement; without the
+        # rollback the caller's next query (the routing graph) fails as well.
+        db.rollback()
         out = []
     if out:
         return out

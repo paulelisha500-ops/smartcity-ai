@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import InternalError, OperationalError
 
 from app.database import get_db
 from app.main import app
@@ -22,6 +22,42 @@ class UnreachableSession:
 
     def query(self, *args, **kwargs):
         raise OperationalError("SELECT 1", {}, Exception("database is down"))
+
+    def rollback(self):
+        pass
+
+    def close(self):
+        pass
+
+
+class AbortingSession:
+    """
+    Fails its first query, then refuses every statement until rolled back —
+    what Postgres does to a transaction after an error. Afterwards it answers
+    the road-network count with 0 (network not ingested).
+    """
+
+    def __init__(self):
+        self.queries = 0
+        self.aborted = False
+
+    def query(self, *args, **kwargs):
+        if self.aborted:
+            raise InternalError("SELECT 1", {}, Exception("current transaction is aborted"))
+        self.queries += 1
+        if self.queries == 1:
+            self.aborted = True
+            raise OperationalError("SELECT 1", {}, Exception("canceling statement due to statement timeout"))
+        return self
+
+    def filter(self, *args, **kwargs):
+        return self
+
+    def scalar(self):
+        return 0
+
+    def rollback(self):
+        self.aborted = False
 
     def close(self):
         pass
@@ -41,6 +77,9 @@ class GazetteerSession:
 
     def all(self):
         return self.rows
+
+
+client = TestClient(app)  # no `with`: skips startup (no DB/Redis needed)
 
 
 def place(id_, name, lon, lat, emirate):
@@ -67,6 +106,32 @@ def test_register_falls_back_when_the_gazetteer_is_empty_or_unreachable():
         assert register == [f for f in FACILITIES if f["type"] == "police"]
 
 
+def test_dispatch_still_answers_after_the_gazetteer_query_fails():
+    # The fallback is only useful if the request can carry on: a failed query
+    # leaves the transaction aborted, and dispatch's next query must still run.
+    app.dependency_overrides[get_db] = AbortingSession
+    try:
+        res = client.get("/api/emergency/nearest-facility?lat=25.24&lon=55.29&facility_type=hospital")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+    assert res.status_code == 200
+    body = res.json()
+    assert body["routed_on_real_network"] is False
+    fallback = {f["id"] for f in FACILITIES if f["type"] == "hospital"}
+    assert body["candidates"] and {c["id"] for c in body["candidates"]} <= fallback
+
+
+def test_forecast_leaves_the_session_usable_after_a_failed_read():
+    session = AbortingSession()
+    app.dependency_overrides[get_db] = lambda: session
+    try:
+        body = client.get("/api/prediction/intersection/3?horizon_hours=2").json()
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+    assert body["basis"] == "typical_pattern"
+    assert not session.aborted
+
+
 def test_only_response_stations_are_dispatch_candidates():
     assert responds("fire", "Khalifa City Fire Station")
     assert responds("fire", "Civil Defence Station Al Karama")
@@ -84,8 +149,6 @@ def test_only_response_stations_are_dispatch_candidates():
 def test_unknown_service_has_no_facilities():
     assert facility_register(GazetteerSession([place(1, "X", 55.0, 25.0, "Dubai")]), "lifeguard") == []
 
-
-client = TestClient(app)  # no `with`: skips startup (no DB/Redis needed)
 
 
 def test_forecast_without_history_uses_the_typical_pattern():

@@ -43,6 +43,7 @@ def forecast_intersection(
         )
         history = [{"ts": ts, "congestion_score": score} for ts, score in rows if score is not None]
     except SQLAlchemyError:
+        db.rollback()
         logger.warning("forecast: could not read history for intersection %s", intersection_id, exc_info=True)
 
     forecast = forecasting_service.forecast_intersection(
