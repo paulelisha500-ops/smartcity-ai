@@ -100,6 +100,17 @@ def test_register_uses_the_gazetteer_and_folds_duplicates():
     assert abs(register[0]["lat"] - 24.4602) < 1e-9 and abs(register[0]["lon"] - 54.3501) < 1e-9
 
 
+def test_register_folds_duplicates_across_a_rounding_boundary():
+    # ~2 m apart, but 25.23449 and 25.23451 round to different third decimals.
+    rows = [
+        place(1, "Rashid Hospital", 55.3210, 25.23449, "Dubai"),
+        place(2, "Rashid Hospital", 55.3210, 25.23451, "Dubai"),
+        # Same name, 1.1 km away: a different facility.
+        place(3, "Rashid Hospital", 55.3210, 25.2445, "Dubai"),
+    ]
+    assert [f["id"] for f in facility_register(GazetteerSession(rows), "hospital")] == ["osm-1", "osm-3"]
+
+
 def test_register_falls_back_when_the_gazetteer_is_empty_or_unreachable():
     for session in (GazetteerSession([]), UnreachableSession()):
         register = facility_register(session, "police")
@@ -183,3 +194,29 @@ def test_forecast_uses_stored_history():
 def test_forecast_horizon_is_bounded():
     assert client.get("/api/prediction/intersection/3?horizon_hours=0").status_code == 422
     assert client.get("/api/prediction/intersection/3?horizon_hours=169").status_code == 422
+
+
+def test_forecast_fills_hours_without_readings_from_the_typical_pattern():
+    from datetime import datetime, timedelta
+    from statistics import mean
+
+    from app.services.forecasting import forecasting_service
+
+    # Readings for one hour of the day only.
+    now = datetime.utcnow()
+    stored_hour = (now + timedelta(hours=1)).hour
+    rows = [((now - timedelta(days=d)).replace(hour=stored_hour), 12.0) for d in range(1, 4)]
+    app.dependency_overrides[get_db] = lambda: GazetteerSession(rows)
+    try:
+        body = client.get("/api/prediction/intersection/3?horizon_hours=24").json()
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+    typical = forecasting_service._by_hour(forecasting_service._synthetic_history(3))
+
+    assert body["basis"] == "history"
+    for point in body["forecast"]:
+        hour = datetime.fromisoformat(point["ts"]).hour
+        expected = 12.0 if hour == stored_hour else round(mean(typical.get(hour, [40.0])), 1)
+        assert point["predicted_congestion_score"] == expected
+    # The typical profile's rush hours survive.
+    assert max(p["predicted_congestion_score"] for p in body["forecast"]) >= 70

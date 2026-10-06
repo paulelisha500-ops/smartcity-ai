@@ -29,9 +29,10 @@ def forecast_intersection(
 
     The baseline is built from the readings actually stored for this junction.
     It used to be called with no history at all, so every forecast came from
-    the fixed fallback profile and ignored what had been recorded. The fallback
-    remains for a junction with nothing stored yet (or an unreachable
-    database), and `basis` says which one produced the answer.
+    the fixed fallback profile and ignored what had been recorded. The typical
+    profile still covers a junction with nothing stored yet (or an unreachable
+    database), and any hour of the day the stored readings do not cover;
+    `basis` says whether stored readings were used at all.
     """
     history: list[dict] = []
     try:

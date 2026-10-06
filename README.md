@@ -56,6 +56,8 @@ a one-method swap.
 docker compose up -d --build
 ```
 
+Needs Docker Compose 2.24 or later, for the optional `.env` the services read.
+
 - Frontend: <http://localhost:3001>
 - API docs: <http://localhost:8001/docs>
 

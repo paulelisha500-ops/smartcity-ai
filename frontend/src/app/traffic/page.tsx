@@ -32,6 +32,8 @@ export default function TrafficPage() {
   useEffect(() => {
     if (forecastFor === null) return;
     let current = true;
+    // Clear the last junction's curve, or it sits under the new junction's name until the answer arrives.
+    setForecast(null);
     setForecastError(null);
     api.forecast(forecastFor, 24)
       .then((f) => { if (current) setForecast(f); })

@@ -61,13 +61,17 @@ RESPONDS = {
     "police": re.compile(r"police|شرطة", re.I),
 }
 DOES_NOT_RESPOND = {
-    "fire": re.compile(r"\b(?:co|company|llc|trading|training|safety|systems?)\b", re.I),
+    # re.ASCII: JavaScript's \b only knows ASCII word characters; match it.
+    "fire": re.compile(r"\b(?:co|company|llc|trading|training|safety|systems?)\b", re.I | re.ASCII),
     "police": re.compile(
         r"college|licens|fine|parking|kiosk|check ?point|medical|social|special tasks|"
         r"investigation|drugs|community|ministry|office",
         re.I,
     ),
 }
+
+# Entries with the same name this close together are one facility mapped twice.
+SAME_FACILITY_M = 100.0
 
 # Speed for the stretch between an address and the nearest routable road, which
 # the network route does not cover (it runs junction to junction).
@@ -88,11 +92,13 @@ def facility_register(db: Session, facility_type: str | None = None) -> list[dic
     gazetteer has been imported.
 
     OSM often maps one hospital twice (the amenity and its building), so
-    entries with the same name within ~100 m are folded into one.
+    entries with the same name within 100 m are folded into one.
     """
+    from app.services.osm_network import haversine_km
+
     wanted = [facility_type] if facility_type else list(SERVICE_SUBCATEGORY)
     out: list[dict] = []
-    seen: set[tuple] = set()
+    kept: dict[tuple[str, str], list[tuple[float, float]]] = {}
     try:
         for service in wanted:
             subcategory = SERVICE_SUBCATEGORY.get(service)
@@ -102,10 +108,11 @@ def facility_register(db: Session, facility_type: str | None = None) -> list[dic
                 if not responds(service, place.name):
                     continue
                 point = to_shape(place.geom)
-                key = (service, place.name.strip().lower(), round(point.y, 3), round(point.x, 3))
-                if key in seen:
+                same_name = kept.setdefault((service, place.name.strip().lower()), [])
+                if any(haversine_km(point.y, point.x, lat, lon) * 1000.0 <= SAME_FACILITY_M
+                       for lat, lon in same_name):
                     continue
-                seen.add(key)
+                same_name.append((point.y, point.x))
                 out.append({
                     "id": f"osm-{place.id}", "name": place.name, "type": service,
                     "lat": point.y, "lon": point.x, "emirate": place.emirate,

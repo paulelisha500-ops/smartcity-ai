@@ -868,12 +868,22 @@ export function distanceToLineM(lat: number, lon: number, line: [number, number]
   return best;
 }
 
+/**
+ * The `lat` and `lon` of a request, or null where the API answers 422. A bare
+ * Number() would read a missing or empty parameter as 0.
+ */
+function coordinates(q: URLSearchParams): [number, number] | null {
+  const [latText, lonText] = [q.get("lat")?.trim(), q.get("lon")?.trim()];
+  if (!latText || !lonText) return null;
+  const [lat, lon] = [Number(latText), Number(lonText)];
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return [lat, lon];
+}
+
 async function reverseGeocode(q: URLSearchParams): Promise<Response> {
-  const lat = Number(q.get("lat"));
-  const lon = Number(q.get("lon"));
-  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
-    return reply({ detail: "lat and lon must be valid coordinates" }, 422);
-  }
+  const point = coordinates(q);
+  if (!point) return reply({ detail: "lat and lon must be valid coordinates" }, 422);
+  const [lat, lon] = point;
   const radiusM = Math.min(Number(q.get("radius_m") ?? 1500), 20000);
   const deg = radiusM / 111_320;
 
@@ -950,6 +960,9 @@ const DOES_NOT_RESPOND: Record<string, RegExp> = {
 const responds = (service: string, name: string) =>
   (!RESPONDS[service] || RESPONDS[service].test(name)) && !DOES_NOT_RESPOND[service]?.test(name);
 
+// Entries with the same name this close together are one facility mapped twice.
+const SAME_FACILITY_M = 100;
+
 // Speed for the stretch between an address and the nearest routable junction.
 const ACCESS_SPEED_KMH = 30;
 
@@ -957,15 +970,17 @@ const ACCESS_SPEED_KMH = 30;
 async function facilityRegister(type?: string | null): Promise<Facility[]> {
   const { places } = await loadGazetteer();
   const out: Facility[] = [];
-  const seen = new Set<string>();
+  const kept = new Map<string, [number, number][]>();
   for (const service of type ? [type] : Object.keys(SERVICE_SUBCATEGORY)) {
     const subcategory = SERVICE_SUBCATEGORY[service];
     if (!subcategory) continue;
     for (const { row } of places) {
       if (row[4] !== subcategory || !responds(service, row[1])) continue;
-      const key = `${service}|${row[1].trim().toLowerCase()}|${round(row[6], 3)}|${round(row[7], 3)}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
+      const key = `${service}|${row[1].trim().toLowerCase()}`;
+      const sameName = kept.get(key) ?? [];
+      if (sameName.some(([lat, lon]) => haversineKm(row[6], row[7], lat, lon) * 1000 <= SAME_FACILITY_M)) continue;
+      sameName.push([row[6], row[7]]);
+      kept.set(key, sameName);
       out.push({ id: `osm-${row[0]}`, name: row[1], type: service, lat: row[6], lon: row[7], emirate: row[5] });
     }
   }
@@ -978,11 +993,9 @@ async function facilityRegister(type?: string | null): Promise<Facility[]> {
  * over the road network with the blue-light factor, rank by drive time.
  */
 async function nearestFacility(q: URLSearchParams): Promise<Response> {
-  const lat = Number(q.get("lat"));
-  const lon = Number(q.get("lon"));
-  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
-    return reply({ detail: "lat and lon must be valid coordinates" }, 422);
-  }
+  const point = coordinates(q);
+  if (!point) return reply({ detail: "lat and lon must be valid coordinates" }, 422);
+  const [lat, lon] = point;
   const kind = q.get("facility_type") ?? "hospital";
   const candidates = await facilityRegister(kind);
   if (!candidates.length) return reply({ error: `no facilities of type '${kind}'` });

@@ -41,6 +41,10 @@ SPACE = os.environ.get("HF_SPACE", "Elisha622/smartcity-ai")
 BATCH_BYTES = 8 * 1024 * 1024
 BATCH_FILES = 400
 
+# The Hub stores any file over 10 MB in LFS however it is uploaded, so a file
+# that size can only be compared by its LFS hash.
+LFS_ONLY_BYTES = 10 * 1024 * 1024
+
 
 def site_files() -> dict[str, Path]:
     """Everything in the export except the data set, keyed by repo path."""
@@ -66,16 +70,20 @@ def publish_data(api: HfApi) -> None:
     try:
         for entry in api.list_repo_tree(SPACE, repo_type="space", path_in_repo="data", recursive=True):
             if isinstance(entry, RepoFile):
-                # Ordinary files are compared by git blob id. An LFS file is
-                # always re-uploaded: the data set is published as ordinary
-                # files (see BATCH_BYTES), so an LFS copy is a leftover to replace.
-                remote[entry.path] = {entry.blob_id} if not entry.lfs else set()
+                # Ordinary files are compared by git blob id. The data set is
+                # published as ordinary files (see BATCH_BYTES), so an LFS copy
+                # of a small file is a leftover to replace; a large one cannot
+                # be anything else (LFS_ONLY_BYTES).
+                remote[entry.path] = {entry.blob_id} if not entry.lfs else {f"lfs:{entry.lfs.sha256}"}
     except EntryNotFoundError:
         pass
 
     def unchanged(name: str, path: Path) -> bool:
         payload = path.read_bytes()
-        return git_blob_sha(payload) in remote.get(name, set())
+        current = {git_blob_sha(payload)}
+        if len(payload) > LFS_ONLY_BYTES:
+            current.add(f"lfs:{hashlib.sha256(payload).hexdigest()}")
+        return bool(current & remote.get(name, set()))
 
     changed = [name for name, path in local.items() if not unchanged(name, path)]
     stale = [name for name in remote if name not in local]
