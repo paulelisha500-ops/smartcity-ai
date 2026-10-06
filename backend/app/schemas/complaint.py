@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing import Optional
 from datetime import datetime
 
@@ -43,8 +43,7 @@ class ComplaintOut(BaseModel):
     lat: Optional[float] = None
     lon: Optional[float] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ComplaintAnalysis(BaseModel):

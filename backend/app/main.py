@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import random
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import redis.asyncio as aioredis
@@ -22,10 +23,31 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Prepare the database and start the background tasks; stop them on exit.
+
+    `init_db` retries on a bounded budget and returns False rather than
+    blocking forever, so a bad DSN surfaces as a failing endpoint with a log
+    line instead of a server that never finishes booting.
+    """
+    assert_secure_config()  # raises outside development with default secrets
+    app.state.db_ready = init_db()
+    # Reference kept on app.state so the task isn't garbage-collected — asyncio
+    # only holds a weak reference to a task once nothing else points at it.
+    app.state.live_subscriber_task = asyncio.create_task(_redis_subscriber())
+    app.state.graph_warm_task = asyncio.create_task(_warm_routing_graph())
+    yield
+    for task in (app.state.live_subscriber_task, app.state.graph_warm_task):
+        task.cancel()
+
+
 app = FastAPI(
     title=settings.app_name,
     description="Intelligent Urban Planning & Traffic Management Platform — API",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -69,21 +91,6 @@ MODULES = [
 ]
 
 
-@app.on_event("startup")
-def on_startup():
-    """
-    Prepare the database. `init_db` retries on a bounded budget and returns
-    False rather than blocking forever, so a bad DSN surfaces as a failing
-    endpoint with a log line instead of a server that never finishes booting.
-    """
-    assert_secure_config()  # raises outside development with default secrets
-    app.state.db_ready = init_db()
-    # Reference kept on app.state so the task isn't garbage-collected — asyncio
-    # only holds a weak reference to a task once nothing else points at it.
-    app.state.live_subscriber_task = asyncio.create_task(_redis_subscriber())
-    app.state.graph_warm_task = asyncio.create_task(_warm_routing_graph())
-
-
 async def _warm_routing_graph():
     """
     Build the routing graph in the background at boot.
@@ -106,13 +113,6 @@ async def _warm_routing_graph():
         await asyncio.to_thread(build)
     except Exception:
         logger.warning("routing graph warm-up failed; it will build on first request", exc_info=True)
-
-
-@app.on_event("shutdown")
-async def on_shutdown():
-    task = getattr(app.state, "live_subscriber_task", None)
-    if task:
-        task.cancel()
 
 
 @app.get("/")

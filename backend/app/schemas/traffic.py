@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 
 
@@ -20,8 +20,7 @@ class TrafficReadingOut(BaseModel):
     queue_length_m: float
     lane_occupancy_pct: float
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CongestionHotspot(BaseModel):

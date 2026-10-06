@@ -1,5 +1,5 @@
 from functools import lru_cache
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -69,9 +69,11 @@ class Settings(BaseSettings):
     dubai_pulse_key: str = ""
     dubai_pulse_secret: str = ""
 
-    class Config:
-        env_prefix = "SMARTCITY_"
-        env_file = ".env"
+    # `model_mode` starts with "model_", which pydantic reserves by default;
+    # narrowing the reserved prefix keeps the setting's name without a warning.
+    model_config = SettingsConfigDict(
+        env_prefix="SMARTCITY_", env_file=".env", protected_namespaces=("settings_",),
+    )
 
 
 @lru_cache
