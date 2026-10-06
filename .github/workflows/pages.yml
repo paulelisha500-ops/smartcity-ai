@@ -10,6 +10,10 @@ name: Pages
 on:
   push:
     branches: [main]
+  # Pull requests build and test the Pages copy without publishing it, so a
+  # change that breaks it under the base path is caught before it reaches main.
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -18,7 +22,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  # Per branch, so a pull request's run never cancels a deploy from main.
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -76,13 +81,16 @@ jobs:
           node e2e/suite.mjs "http://127.0.0.1:7861${BASE_PATH}"
 
       - uses: actions/configure-pages@v5
+        if: github.event_name != 'pull_request'
 
       - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
         with:
           path: frontend/out
 
   deploy:
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

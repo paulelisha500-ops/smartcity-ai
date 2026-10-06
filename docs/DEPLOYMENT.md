@@ -22,7 +22,9 @@ They are the same build with one difference: Pages serves a project under
 `/<repository>`, so that copy is built with `NEXT_PUBLIC_BASE_PATH=/smartcity-ai`.
 Anything that addresses a file in `/public` by path has to go through
 `asset()` (`frontend/src/lib/asset.ts`) for that to work — Next prefixes links
-and scripts itself, but not a string `src`.
+and scripts itself, but not a string `src`. Next 14 also asks for the home
+page's data at `/smartcity-ai.txt`, outside the site; a script in
+`frontend/src/app/layout.tsx` points that request at `/smartcity-ai/index.txt`.
 
 A static Space serves files and nothing else, so the frontend is built with
 `NEXT_PUBLIC_STATIC_API=1`. In that build `frontend/src/lib/api.ts` hands every
@@ -72,7 +74,9 @@ GitHub Pages has to be switched on once, with "GitHub Actions" as its source
 (repository Settings → Pages, or `gh api -X POST repos/OWNER/REPO/pages -f build_type=workflow`).
 The Pages workflow takes its copy of the data set from the Space, so the two
 hosts always serve the same data, and it runs the end-to-end suite against the
-build before publishing: a build with a broken control is not deployed.
+build before publishing: a build with a broken control is not deployed. Pull
+requests run the same build and suite without publishing, so a change that
+breaks the Pages copy shows up on the pull request rather than on `main`.
 
 **The data set** under `data/` is a snapshot of a database with the network
 ingested, which CI does not have. Refresh it from a machine running the

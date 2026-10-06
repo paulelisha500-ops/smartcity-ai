@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import AppShell from "@/components/AppShell";
 
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 export const metadata: Metadata = {
   title: "SmartCity AI — Urban Planning & Traffic Platform",
   description:
@@ -24,6 +26,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               __html:
                 'var p=location.pathname.replace(/\\/index\\.html$/,"/").replace(/\\.html$/,"");' +
                 'if(p!==location.pathname)history.replaceState(null,"",p+location.search+location.hash)',
+            }}
+          />
+        )}
+        {process.env.NEXT_PUBLIC_STATIC_API === "1" && BASE_PATH && (
+          // Next 14 fetches a static export's page data from "<path>.txt". For
+          // the home page under a base path that is "/smartcity-ai.txt" — outside
+          // the site, so every client-side visit to the dashboard hit a 404 and
+          // reloaded the whole page. Its data is at "/smartcity-ai/index.txt".
+          <script
+            dangerouslySetInnerHTML={{
+              __html:
+                `(function(){var f=window.fetch,a=${JSON.stringify(`${BASE_PATH}.txt`)},b=${JSON.stringify(`${BASE_PATH}/index.txt`)};` +
+                'window.fetch=function(i,o){if(typeof i==="string"||i instanceof URL){var u=new URL(i,location.href);' +
+                "if(u.origin===location.origin&&u.pathname===a){u.pathname=b;i=u}}return f(i,o)}})()",
             }}
           />
         )}

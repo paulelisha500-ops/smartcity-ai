@@ -67,6 +67,10 @@ const PUBLIC_PAGES = {
 const results = [];
 const external = new Map();
 let problems = [];
+// Page-data prefetches a navigation cancelled during the current check. Next
+// logs each as "Failed to fetch RSC payload"; a click never cancels them, but
+// a test's page.goto does.
+let cancelled = new Set();
 
 const url = (path) => `${BASE}${path === "/" ? "/" : path}`;
 /** The href Next renders for an app path on this host. */
@@ -96,7 +100,14 @@ function watch(page) {
   page.on("requestfailed", (req) => {
     const u = req.url();
     const why = req.failure()?.errorText ?? "";
-    if (/ERR_ABORTED/.test(why)) return; // navigation cancelled an in-flight request
+    if (/ERR_ABORTED/.test(why)) { // navigation cancelled an in-flight request
+      const target = new URL(u);
+      if (isOwn(u) && target.searchParams.has("_rsc")) {
+        // /about.txt?_rsc=… is the payload for /about; /index.txt, for /.
+        cancelled.add(`${target.origin}${target.pathname.replace(/\.txt$/, "").replace(/\/index$/, "/")}`);
+      }
+      return;
+    }
     if (isOwn(u)) problems.push(`request failed: ${u} (${why})`);
     else external.set(new URL(u).host, (external.get(new URL(u).host) ?? 0) + 1);
   });
@@ -112,6 +123,7 @@ async function check(area, name, fn, { allow = [] } = {}) {
   const label = `${area} › ${name}`;
   if (ONLY && !ONLY.test(label)) return;
   problems = [];
+  cancelled = new Set();
   const started = Date.now();
   let error = null;
   try {
@@ -119,7 +131,9 @@ async function check(area, name, fn, { allow = [] } = {}) {
   } catch (e) {
     error = String(e.message ?? e).split("\n")[0].slice(0, 400);
   }
-  const unexpected = problems.filter((p) => !allow.some((re) => re.test(p)));
+  const unexpected = problems
+    .filter((p) => !cancelled.has(/^console error: Failed to fetch RSC payload for (\S+?)\. /.exec(p)?.[1]))
+    .filter((p) => !allow.some((re) => re.test(p)));
   const failures = [...(error ? [error] : []), ...unexpected];
   results.push({ label, ok: failures.length === 0, failures, ms: Date.now() - started });
   process.stdout.write(`${failures.length ? "FAIL" : " ok "}  ${label}${failures.length ? `\n        ${failures.join("\n        ")}` : ""}\n`);
