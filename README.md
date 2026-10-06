@@ -5,8 +5,11 @@ covering traffic analysis, citizen services, emergency response, and long-range
 infrastructure planning — running on the **real UAE road network**, with a
 **real CCTV integration layer**, on a laptop, with no GPU and no paid API keys.
 
-**Live:** <https://elisha622-smartcity-ai.static.hf.space> — the hosted edition,
-published to a Hugging Face Space by GitHub Actions on every push to `main`.
+**Live** — the hosted edition, published by GitHub Actions on every push to `main`:
+
+- <https://elisha622-smartcity-ai.static.hf.space> (Hugging Face Space)
+- <https://paulelisha500-ops.github.io/smartcity-ai/> (GitHub Pages)
+
 Sign in from the welcome page with any of the role accounts.
 
 ## What is actually real here
@@ -41,7 +44,7 @@ a one-method swap.
 | 5 | AI City Planner (RAG) | `/planner` | **Real** grounded retrieval; LLM synthesis is the swap point |
 | 6 | Digital Twin Dashboard | `/` | **Real** |
 | 7 | Emergency Routing & Dispatch | `/dispatch` | **Real** — A* over the UAE network |
-| 8 | Government Analytics / KPIs | `/` | **Real** |
+| 8 | Government Analytics / KPIs | `/analytics` | **Real** |
 | 9 | CCTV Camera Network | `/cameras` | **Real** RTSP/ONVIF client |
 | 10 | UAE Road Network & Borders | `/network` | **Real** OSM ingestion |
 | 11 | Infrastructure & Bridges | `/infrastructure` | **Real** sourced register |
@@ -66,14 +69,18 @@ The stack starts empty. Populate it from the UI:
 1. **`/network`** → **INGEST NETWORK** — downloads the UAE highway network from
    OpenStreetMap. Takes 1–5 minutes; everything geographic depends on it.
 2. **`/infrastructure`** → **LOAD REGISTER** — loads the UAE bridge/corridor projects.
-3. **`/cameras`** → **SEED SITES** — creates the monitored junctions as camera sites.
+3. **`/cameras`** → **ADD SITES** — creates the monitored junctions as camera sites.
 
-Or from the API:
+Or from the API, signed in as an administrator (writes need the session cookie
+and the `X-Requested-With` header the API uses as its CSRF guard):
 
 ```bash
-curl -X POST "http://localhost:8001/api/network/ingest?wait=true"
-curl -X POST http://localhost:8001/api/infrastructure/seed
-curl -X POST http://localhost:8001/api/cameras/seed-sites
+H='X-Requested-With: smartcity-console'
+curl -c session.txt -H "$H" -H 'Content-Type: application/json' \
+     -d '{"email":"admin@city.gov","password":"smartcity"}' http://localhost:8001/api/auth/login
+curl -b session.txt -H "$H" -X POST "http://localhost:8001/api/network/ingest?wait=true"
+curl -b session.txt -H "$H" -X POST http://localhost:8001/api/infrastructure/seed
+curl -b session.txt -H "$H" -X POST http://localhost:8001/api/cameras/seed-sites
 ```
 
 MongoDB is in the architecture for raw CV frames and LLM logs but no code path
@@ -102,9 +109,10 @@ Three rules the implementation enforces:
   640×480, and decoding a 4MP main stream per camera is what makes city-scale
   CV fall over.
 
-Without a camera agreement you can still pull real Dubai government traffic
-data from [Dubai Pulse](https://www.dubaipulse.gov.ae) — set
-`SMARTCITY_DUBAI_PULSE_KEY` and `SMARTCITY_DUBAI_PULSE_SECRET`.
+Without a camera agreement, Dubai government traffic data is published as open
+data by [Dubai Pulse](https://www.dubaipulse.gov.ae). The settings
+`SMARTCITY_DUBAI_PULSE_KEY` and `SMARTCITY_DUBAI_PULSE_SECRET` are reserved for a
+Dubai Pulse connector, which is on the roadmap and not built yet.
 
 ## Cross-border corridors
 

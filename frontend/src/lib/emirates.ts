@@ -8,6 +8,8 @@
  * swapped with it. Files live in `public/emirates/` and are served locally, so
  * the pages do not hotlink Commons.
  */
+import { asset } from "@/lib/asset";
+
 export interface Emirate {
   slug: string;
   name: string;
@@ -24,7 +26,7 @@ export const EMIRATES: Emirate[] = [
     name: "Dubai",
     code: "E11 · E311 · E611",
     note: "Densest modelled network — Sheikh Zayed Road, Al Khail and the Emirates Road corridor.",
-    image: "/emirates/dubai.webp",
+    image: asset("/emirates/dubai.webp"),
     alt: "Burj Khalifa and the Dubai skyline",
     credit: {
       photographer: "imran shahabuddin",
@@ -37,7 +39,7 @@ export const EMIRATES: Emirate[] = [
     name: "Abu Dhabi",
     code: "E10 · E11 · E20",
     note: "Largest emirate by area; carries the E11 west to the Saudi crossing at Al Ghuwaifat.",
-    image: "/emirates/abu-dhabi.webp",
+    image: asset("/emirates/abu-dhabi.webp"),
     alt: "Abu Dhabi city",
     credit: {
       photographer: "Adilamin786",
@@ -50,7 +52,7 @@ export const EMIRATES: Emirate[] = [
     name: "Sharjah",
     code: "E11 · E88 · E102",
     note: "The heaviest cross-emirate commute in the country runs through here each morning.",
-    image: "/emirates/sharjah.webp",
+    image: asset("/emirates/sharjah.webp"),
     alt: "Sharjah corniche at night",
     credit: {
       photographer: "NikithaSuresh 26",
@@ -63,7 +65,7 @@ export const EMIRATES: Emirate[] = [
     name: "Ajman",
     code: "E11",
     note: "Smallest emirate; its corniche corridor feeds directly onto the E11.",
-    image: "/emirates/ajman.webp",
+    image: asset("/emirates/ajman.webp"),
     alt: "A ship on the Ajman coast",
     credit: {
       photographer: "SHARON VISHAKHAM",
@@ -76,7 +78,7 @@ export const EMIRATES: Emirate[] = [
     name: "Umm Al Quwain",
     code: "E11 · E55",
     note: "Coastal lagoon emirate between Ajman and Ras Al Khaimah.",
-    image: "/emirates/umm-al-quwain.webp",
+    image: asset("/emirates/umm-al-quwain.webp"),
     alt: "Sunset over Umm Al Quwain beach",
     credit: {
       photographer: "Anamsajid2013",
@@ -89,7 +91,7 @@ export const EMIRATES: Emirate[] = [
     name: "Ras Al Khaimah",
     code: "E11 · E18",
     note: "Northern terminus of the E11 and the Al Darah crossing into Omani Musandam.",
-    image: "/emirates/ras-al-khaimah.webp",
+    image: asset("/emirates/ras-al-khaimah.webp"),
     alt: "Aerial view over Ras Al Khaimah",
     credit: {
       photographer: "Snapshotdxb",
@@ -102,7 +104,7 @@ export const EMIRATES: Emirate[] = [
     name: "Fujairah",
     code: "E99 · E89",
     note: "The only emirate on the Gulf of Oman; Khatmat Malaha crossing sits on its approach.",
-    image: "/emirates/fujairah.webp",
+    image: asset("/emirates/fujairah.webp"),
     alt: "Al Bithnah Fort, Fujairah",
     credit: {
       photographer: 'Mike "fasmike" Che',

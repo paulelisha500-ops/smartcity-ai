@@ -12,8 +12,11 @@ const RANGE_OPTIONS = [
   { label: "7D", hours: 24 * 7 },
 ];
 
+/** The API's timestamps are UTC without an offset; read as UTC, shown in local time. */
+const utc = (iso: string) => new Date(/Z$|[+-]\d\d:\d\d$/.test(iso) ? iso : `${iso}Z`);
+
 function hourLabel(iso: string, spanHours: number) {
-  const d = new Date(iso);
+  const d = utc(iso);
   // Past a few days the hour alone is ambiguous (which day?), so widen the
   // label rather than let two ticks read identically on the x-axis.
   return spanHours > 24 * 2
@@ -22,7 +25,8 @@ function hourLabel(iso: string, spanHours: number) {
 }
 
 function dayLabel(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  // A UTC calendar day: format it in UTC, or it slips a day west of Greenwich.
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
 export default function AnalyticsPage() {
@@ -39,11 +43,22 @@ export default function AnalyticsPage() {
   }, []);
 
   useEffect(() => {
+    // A slower answer for the range just left must not replace this one.
+    let current = true;
     setLoading(true);
     api.congestionHistory(rangeHours)
-      .then(setCongestion)
-      .catch((e) => { setCongestion([]); setError(describeError(e)); })
-      .finally(() => setLoading(false));
+      .then((points) => {
+        if (!current) return;
+        setCongestion(points);
+        setError(null);
+      })
+      .catch((e) => {
+        if (!current) return;
+        setCongestion([]);
+        setError(describeError(e));
+      })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
   }, [rangeHours]);
 
   const congestionEmpty = !loading && congestion.length === 0;

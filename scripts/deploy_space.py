@@ -66,10 +66,10 @@ def publish_data(api: HfApi) -> None:
     try:
         for entry in api.list_repo_tree(SPACE, repo_type="space", path_in_repo="data", recursive=True):
             if isinstance(entry, RepoFile):
-                # Ordinary files report their git blob id; LFS files, the sha256
-                # of the content. Accept either so an earlier LFS upload is
-                # replaced rather than mistaken for current.
-                remote[entry.path] = {entry.blob_id} if not entry.lfs else {f"lfs:{entry.lfs.sha256}"}
+                # Ordinary files are compared by git blob id. An LFS file is
+                # always re-uploaded: the data set is published as ordinary
+                # files (see BATCH_BYTES), so an LFS copy is a leftover to replace.
+                remote[entry.path] = {entry.blob_id} if not entry.lfs else set()
     except EntryNotFoundError:
         pass
 
@@ -121,8 +121,14 @@ def main() -> None:
     api.create_repo(SPACE, repo_type="space", space_sdk="static", exist_ok=True)
 
     if args.data:
-        if not (DATA / "manifest.json.gz").exists():
-            raise SystemExit("frontend/public/data is missing — run scripts/snapshot_static.py first.")
+        # Publishing removes whatever the local snapshot lacks, so a snapshot
+        # that stopped part-way would take the published tiles and graph with it.
+        required = ["manifest.json.gz", "roads/index.json.gz", "routing/graph.bin.gz",
+                    "search/places.json.gz", "search/streets.json.gz"]
+        missing = [name for name in required if not (DATA / name).exists()]
+        if missing:
+            raise SystemExit(f"the snapshot in frontend/public/data is incomplete (missing {missing}) — "
+                             "re-run scripts/snapshot_static.py.")
         publish_data(api)
 
     local = site_files()

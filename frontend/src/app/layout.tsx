@@ -14,13 +14,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <head>
         {process.env.NEXT_PUBLIC_STATIC_API === "1" && (
-          // The static host answers "/" with a redirect to /index.html, which
-          // is not a route. Restore the real path before the router reads it.
+          // A static host serves each page as a file, so the same page answers
+          // at /cameras and /cameras.html, and "/" arrives as /index.html.
+          // Neither file name is a route: left alone, the router would treat
+          // /cameras.html as an unknown address and skip the console's access
+          // checks. Restore the real path before the router reads it.
           <script
             dangerouslySetInnerHTML={{
               __html:
-                'if(location.pathname.endsWith("/index.html"))' +
-                'history.replaceState(null,"",location.pathname.slice(0,-10)+location.search+location.hash)',
+                'var p=location.pathname.replace(/\\/index\\.html$/,"/").replace(/\\.html$/,"");' +
+                'if(p!==location.pathname)history.replaceState(null,"",p+location.search+location.hash)',
             }}
           />
         )}

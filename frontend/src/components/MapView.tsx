@@ -67,11 +67,62 @@ function cameraColor(status: string) {
  * treats it as initial state, so a search result would never move the map
  * without imperatively calling flyTo through the map instance.
  */
-function FocusFlyTo({ focus, zoom }: { focus?: { lat: number; lon: number }; zoom: number }) {
+function FocusFlyTo({ focus, zoom }: { focus?: { lat: number; lon: number; nonce?: number }; zoom: number }) {
   const map = useMap();
   useEffect(() => {
     if (focus) map.flyTo([focus.lat, focus.lon], zoom, { duration: 0.9 });
-  }, [focus?.lat, focus?.lon, zoom, map]);
+    // `nonce` lets a caller fly back to the same place after the user has
+    // panned away — the coordinates alone would not change. The object
+    // itself is rebuilt by callers on every render, so it is not a dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.lat, focus?.lon, focus?.nonce, zoom, map]);
+  return null;
+}
+
+/**
+ * Moves the map when the caller changes `center` or `zoom`.
+ *
+ * MapContainer reads those props once, on mount. A page that picks a new
+ * incident or corridor passes a new centre and expects the map to go there;
+ * without this it stays where it was and draws the new markers off-screen.
+ */
+function FollowCenter({ center, zoom }: { center: [number, number]; zoom: number }) {
+  const map = useMap();
+  const mounted = useRef(false);
+  const [lat, lon] = center;
+  useEffect(() => {
+    // The first run is the mount, which MapContainer has already positioned.
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    map.setView([lat, lon], zoom);
+  }, [lat, lon, zoom, map]);
+  return null;
+}
+
+/**
+ * Frames the map on the routes it is showing.
+ *
+ * A fixed zoom cannot suit both a 3 km bridge and a 110 km corridor: one is a
+ * dot, the other runs off the edge. Fitting the bounds shows the whole line
+ * whatever its length, and re-fits when a different route arrives.
+ */
+function FitRoutes({ routes }: { routes: [number, number][][] }) {
+  const map = useMap();
+  const points = routes.flat();
+  // Identity of the geometry, not of the array: pages rebuild these arrays on
+  // every render, and refitting each time would fight the user's own panning.
+  const first = points[0];
+  const last = points[points.length - 1];
+  const signature = points.length
+    ? `${points.length}:${first[0]},${first[1]}:${last[0]},${last[1]}`
+    : "";
+  useEffect(() => {
+    if (points.length < 2) return;
+    map.fitBounds(L.latLngBounds(points), { padding: [36, 36], maxZoom: 14 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature, map]);
   return null;
 }
 
@@ -257,8 +308,10 @@ interface MapViewProps {
   route?: [number, number][];
   /** A proposed new alignment — drawn dashed to distinguish it from reality. */
   proposedRoute?: [number, number][];
-  /** A searched location to fly to and mark. */
-  focus?: { lat: number; lon: number; label?: string };
+  /** A searched location to fly to and mark. Change `nonce` to fly there again. */
+  focus?: { lat: number; lon: number; label?: string; nonce?: number };
+  /** An incident to mark. Drawn on its own, not as a layer the user can switch off. */
+  incident?: { lat: number; lon: number; label: string };
   /** Load every street in the viewport when zoomed in, and enable right-click identify. */
   detailStreets?: boolean;
   center?: [number, number];
@@ -276,6 +329,7 @@ export default function MapView({
   route,
   proposedRoute,
   focus,
+  incident,
   detailStreets = false,
   center = UAE_CENTER,
   zoom = UAE_ZOOM,
@@ -323,7 +377,7 @@ export default function MapView({
       */}
       <LayersControl position="topright">
         {places.length > 0 && (
-          <LayersControl.Overlay checked name={`Place names (${places.length})`}>
+          <LayersControl.Overlay checked name="Place names">
             <LayerGroup>
               {places.map((p) => {
                 // Settlements with real weight get a permanent label so the map
@@ -365,7 +419,7 @@ export default function MapView({
         )}
 
         {roads.length > 0 && (
-          <LayersControl.Overlay checked name={`Road network (${roads.length})`}>
+          <LayersControl.Overlay checked name="Road network">
             <LayerGroup>
               {roads.map((link) => (
                 <Polyline
@@ -396,7 +450,7 @@ export default function MapView({
         )}
 
         {traffic.length > 0 && (
-          <LayersControl.Overlay checked name={`Traffic (${traffic.length})`}>
+          <LayersControl.Overlay checked name="Traffic">
             <LayerGroup>
               {traffic.map((t) => (
                 <CircleMarker
@@ -426,7 +480,7 @@ export default function MapView({
         )}
 
         {cameras.length > 0 && (
-          <LayersControl.Overlay checked name={`CCTV (${cameras.length})`}>
+          <LayersControl.Overlay checked name="CCTV">
             <LayerGroup>
               {cameras
                 .filter((c) => c.lat !== null && c.lon !== null)
@@ -460,7 +514,7 @@ export default function MapView({
         )}
 
         {borders.length > 0 && (
-          <LayersControl.Overlay checked name={`Border crossings (${borders.length})`}>
+          <LayersControl.Overlay checked name="Border crossings">
             <LayerGroup>
               {borders.map((b) => (
                 <CircleMarker
@@ -488,7 +542,7 @@ export default function MapView({
         )}
 
         {projects.length > 0 && (
-          <LayersControl.Overlay checked name={`Projects (${projects.length})`}>
+          <LayersControl.Overlay checked name="Projects">
             <LayerGroup>
               {projects
                 .filter((p) => p.lat !== null && p.lon !== null)
@@ -522,7 +576,7 @@ export default function MapView({
         )}
 
         {roadDamage.length > 0 && (
-          <LayersControl.Overlay checked name={`Road damage (${roadDamage.length})`}>
+          <LayersControl.Overlay checked name="Road damage">
             <LayerGroup>
               {roadDamage.map((d, i) => (
                 <CircleMarker
@@ -556,6 +610,11 @@ export default function MapView({
       )}
 
       <FocusFlyTo focus={focus} zoom={zoom} />
+      {/* A searched location flies the map itself; otherwise follow the caller. */}
+      {!focus && <FollowCenter center={center} zoom={zoom} />}
+      <FitRoutes
+        routes={[route, proposedRoute].filter((r): r is [number, number][] => !!r && r.length > 1)}
+      />
 
       {focus && (
         <CircleMarker
@@ -568,6 +627,18 @@ export default function MapView({
               <div className="font-mono text-xs font-semibold">{focus.label}</div>
             </Popup>
           )}
+        </CircleMarker>
+      )}
+
+      {incident && (
+        <CircleMarker
+          center={[incident.lat, incident.lon]}
+          radius={10}
+          pathOptions={{ color: "#E2694F", fillColor: "#E2694F", fillOpacity: 0.45, weight: 2.5 }}
+        >
+          <Popup>
+            <div className="font-mono text-xs font-semibold">{incident.label}</div>
+          </Popup>
         </CircleMarker>
       )}
 

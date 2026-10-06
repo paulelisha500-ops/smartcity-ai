@@ -39,10 +39,6 @@ CELL = 0.05
 
 # Mirrors the constants in the pages that call these endpoints.
 NETWORK_FILTERS = ["motorway", "motorway,trunk", "motorway,trunk,primary", ""]
-INCIDENTS = [
-    (25.2180, 55.2790), (25.2450, 55.3320), (25.0780, 55.1400), (24.4750, 54.3400),
-]
-FACILITY_TYPES = ["hospital", "fire", "police"]
 LANES = range(2, 13)
 
 client = httpx.Client(
@@ -100,7 +96,6 @@ def record_gets() -> None:
         ("/api/digital-twin/layers", None),
         ("/api/analytics/kpis", None),
         ("/api/analytics/history/complaints", {"days": 30}),
-        ("/api/emergency/facilities", None),
         ("/api/cameras", None),
         ("/api/cameras/summary", None),
         ("/api/cameras/integration-guide", None),
@@ -142,17 +137,6 @@ def record_gets() -> None:
     dump("get/road-damage-priority.json", get("/api/road-damage/priority", {"limit": 100}))
     dump("manifest.json", manifest)
     print(f"recorded {len(targets) + 1} GET responses")
-
-
-def record_emergency() -> None:
-    for i, (lat, lon) in enumerate(INCIDENTS):
-        for kind in FACILITY_TYPES:
-            dump(f"emergency/{i}-{kind}.json", get(
-                "/api/emergency/nearest-facility",
-                {"lat": lat, "lon": lon, "facility_type": kind},
-            ))
-    dump("emergency/index.json", [{"lat": lat, "lon": lon} for lat, lon in INCIDENTS])
-    print(f"recorded {len(INCIDENTS) * len(FACILITY_TYPES)} dispatch lookups")
 
 
 def record_route_designs() -> None:
@@ -267,7 +251,7 @@ def export_routing_graph() -> None:
 
 STEPS = {
     # Actions first: a camera probe updates the fleet record the GETs then read.
-    "actions": None, "gets": None, "emergency": None, "search": None,
+    "actions": None, "gets": None, "search": None,
     "designs": None, "graph": None, "tiles": None,
 }
 
@@ -280,7 +264,7 @@ def main() -> None:
     login.raise_for_status()
 
     STEPS.update(
-        actions=record_actions, gets=record_gets, emergency=record_emergency,
+        actions=record_actions, gets=record_gets,
         search=record_search_index, designs=record_route_designs,
         graph=export_routing_graph, tiles=record_road_tiles,
     )

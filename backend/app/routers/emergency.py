@@ -6,13 +6,18 @@ back to a small reference graph when it hasn't, so the endpoint is never
 dead. Emergency runs apply a blue-light factor and ignore tolls: an ambulance
 does not detour around a Salik gate.
 """
+import re
+
 from fastapi import APIRouter, Depends, Query
+from geoalchemy2.shape import to_shape
 from pydantic import BaseModel, Field
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.network import RoadLink
+from app.models.place import Place
 from app.routers.auth import require_any, OPERATORS
 from app.services.routing import RoadGraph, emergency_routing_service
 from app.services.road_graph import route_between
@@ -20,7 +25,9 @@ from app.services.road_graph import route_between
 router = APIRouter(prefix="/api/emergency", tags=["emergency"])
 
 
-# Real UAE facilities, used to populate the dispatch console.
+# Fallback register, used until the gazetteer is loaded. It only covers a few
+# Dubai stations, which is why it is a fallback: dispatching a fire to Abu
+# Dhabi from Bur Dubai, 150 km away, is not an answer.
 FACILITIES = [
     {"id": "rashid_hospital", "name": "Rashid Hospital", "type": "hospital",
      "lat": 25.2340, "lon": 55.3210, "emirate": "Dubai"},
@@ -39,6 +46,75 @@ FACILITIES = [
     {"id": "sharjah_hospital", "name": "Al Qassimi Hospital", "type": "hospital",
      "lat": 25.3320, "lon": 55.4180, "emirate": "Sharjah"},
 ]
+
+
+# OpenStreetMap amenity behind each dispatch service.
+SERVICE_SUBCATEGORY = {"hospital": "hospital", "fire": "fire_station", "police": "police"}
+
+# Not everything OSM tags as a fire or police station answers a call: the tags
+# also cover fire-safety firms, a training ground, a police college, licensing
+# and fines offices. A facility is a dispatch candidate when its name says it
+# responds and does not say it is one of those. frontend/src/lib/static-api.ts
+# applies the same two lists; keep them in step.
+RESPONDS = {
+    "fire": re.compile(r"fire station|civil defen[cs]e|rescue|الدفاع المدني|مطافي|اطفاء|إطفاء", re.I),
+    "police": re.compile(r"police|شرطة", re.I),
+}
+DOES_NOT_RESPOND = {
+    "fire": re.compile(r"\b(?:co|company|llc|trading|training|safety|systems?)\b", re.I),
+    "police": re.compile(
+        r"college|licens|fine|parking|kiosk|check ?point|medical|social|special tasks|"
+        r"investigation|drugs|community|ministry|office",
+        re.I,
+    ),
+}
+
+# Speed for the stretch between an address and the nearest routable road, which
+# the network route does not cover (it runs junction to junction).
+ACCESS_SPEED_KMH = 30.0
+
+
+def responds(service: str, name: str) -> bool:
+    """Whether a facility of this service, by its name, is a dispatch candidate."""
+    if service in RESPONDS and not RESPONDS[service].search(name):
+        return False
+    return not (service in DOES_NOT_RESPOND and DOES_NOT_RESPOND[service].search(name))
+
+
+def facility_register(db: Session, facility_type: str | None = None) -> list[dict]:
+    """
+    Every hospital, fire station and police station mapped in the gazetteer —
+    a few hundred across the seven emirates — or the fallback list before the
+    gazetteer has been imported.
+
+    OSM often maps one hospital twice (the amenity and its building), so
+    entries with the same name within ~100 m are folded into one.
+    """
+    wanted = [facility_type] if facility_type else list(SERVICE_SUBCATEGORY)
+    out: list[dict] = []
+    seen: set[tuple] = set()
+    try:
+        for service in wanted:
+            subcategory = SERVICE_SUBCATEGORY.get(service)
+            if not subcategory:
+                continue
+            for place in db.query(Place).filter(Place.subcategory == subcategory).all():
+                if not responds(service, place.name):
+                    continue
+                point = to_shape(place.geom)
+                key = (service, place.name.strip().lower(), round(point.y, 3), round(point.x, 3))
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append({
+                    "id": f"osm-{place.id}", "name": place.name, "type": service,
+                    "lat": point.y, "lon": point.x, "emirate": place.emirate,
+                })
+    except SQLAlchemyError:
+        out = []
+    if out:
+        return out
+    return [f for f in FACILITIES if not facility_type or f["type"] == facility_type]
 
 
 def _reference_graph() -> RoadGraph:
@@ -72,11 +148,10 @@ class GeoRouteRequest(BaseModel):
 
 
 @router.get("/facilities")
-def facilities(facility_type: str | None = None, emirate: str | None = None):
+def facilities(facility_type: str | None = None, emirate: str | None = None,
+               db: Session = Depends(get_db)):
     """Hospitals, fire and police stations available as route endpoints."""
-    out = FACILITIES
-    if facility_type:
-        out = [f for f in out if f["type"] == facility_type]
+    out = facility_register(db, facility_type)
     if emirate:
         out = [f for f in out if f["emirate"] == emirate]
     return out
@@ -134,7 +209,7 @@ def nearest_facility(lat: float = Query(..., ge=-90, le=90), lon: float = Query(
     """
     from app.services.osm_network import haversine_km
 
-    candidates = [f for f in FACILITIES if f["type"] == facility_type]
+    candidates = facility_register(db, facility_type)
     if not candidates:
         return {"error": f"no facilities of type '{facility_type}'"}
 
@@ -153,8 +228,14 @@ def nearest_facility(lat: float = Query(..., ge=-90, le=90), lon: float = Query(
             route = route_between(db, (lat, lon), (facility["lat"], facility["lon"]),
                                   emergency=True)
             if route.get("reachable"):
-                entry["eta_minutes"] = round(route["eta_seconds"] / 60.0, 1)
-                entry["distance_km"] = round(route["distance_m"] / 1000.0, 2)
+                # Door to door: the network leg runs between the junctions
+                # nearest each end, so add the drive to and from them. Without
+                # this a station 1.3 km away that shares the incident's nearest
+                # junction was reported as 0 minutes.
+                access_m = route.get("origin_snap_m", 0.0) + route.get("destination_snap_m", 0.0)
+                eta_s = route["eta_seconds"] + access_m / 1000.0 / ACCESS_SPEED_KMH * 3600.0
+                entry["eta_minutes"] = round(eta_s / 60.0, 1)
+                entry["distance_km"] = round((route["distance_m"] + access_m) / 1000.0, 2)
                 entry["geometry"] = route["geometry"]
         ranked.append(entry)
 

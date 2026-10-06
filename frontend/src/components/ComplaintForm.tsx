@@ -81,7 +81,10 @@ export default function ComplaintForm({
                 <span>📍 {location.name}</span>
                 <button
                   type="button"
-                  onClick={() => setLocation(null)}
+                  onClick={() => {
+                    setLocation(null);
+                    setFormRound((n) => n + 1); // empties the search box too
+                  }}
                   className="text-paper/40 hover:text-paper"
                 >
                   clear

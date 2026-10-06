@@ -7,6 +7,10 @@ import { SectionHead, PublicFooter } from "@/components/PublicChrome";
 
 interface QA { q: string; a: React.ReactNode; }
 
+// Some answers differ between the hosted edition (a static site with the data
+// published alongside it) and a self-hosted deployment with its own API.
+const HOSTED = process.env.NEXT_PUBLIC_STATIC_API === "1";
+
 const SECTIONS: { group: string; items: QA[] }[] = [
   {
     group: "Getting started",
@@ -17,10 +21,20 @@ const SECTIONS: { group: string; items: QA[] }[] = [
           <>
             Pick a role on the{" "}
             <Link href="/login" className="text-signal-amber hover:underline">sign-in page</Link> —
-            administrator, traffic officer, city planner, maintenance or public user. The
-            role travels in the token as a claim, and the API enforces it on every request,
-            so what a user can see and change is decided server-side rather than by hiding
-            buttons in the interface.
+            administrator, traffic officer, city planner, maintenance or public user.{" "}
+            {HOSTED ? (
+              <>
+                On this hosted edition the role decides which modules the console offers.
+                On a self-hosted deployment it also travels in the session token as a
+                claim, and the API enforces it on every request.
+              </>
+            ) : (
+              <>
+                The role travels in the token as a claim, and the API enforces it on every
+                request, so what a user can see and change is decided server-side rather
+                than by hiding buttons in the interface.
+              </>
+            )}
           </>
         ),
       },
@@ -28,6 +42,14 @@ const SECTIONS: { group: string; items: QA[] }[] = [
         q: "The dashboard is empty. What do I do?",
         a: (
           <>
+            {HOSTED && (
+              <>
+                It should not be: this hosted edition is published with its data — the road
+                network, places, project register and camera sites are already loaded, and
+                nothing needs importing. If a page shows nothing, check your connection and
+                reload. On a self-hosted deployment:{" "}
+              </>
+            )}
             The platform starts with no data loaded. Three one-click actions fill it:
             <strong className="text-paper"> UAE Road Network → INGEST NETWORK</strong> (downloads
             the real road geometry, 1–5 minutes),
@@ -41,6 +63,7 @@ const SECTIONS: { group: string; items: QA[] }[] = [
         q: "Why does the network ingest take minutes?",
         a: (
           <>
+            {HOSTED && <>On a self-hosted deployment, which is where an ingest runs: </>}
             It downloads live data from the public OpenStreetMap Overpass API, which is a
             shared free service under constant load. The ingest tiles the country into
             small requests, fails over between mirrors, and saves each tile as it arrives —
@@ -63,7 +86,7 @@ const SECTIONS: { group: string; items: QA[] }[] = [
             Abu Dhabi by the Department of Municipalities and Transport. Connecting to a live
             feed requires a data-sharing agreement and credentials issued by that authority.
             Once you have them, you enter the host and credential reference and the camera
-            works like any other.
+            works like any other{HOSTED ? " — on a self-hosted deployment, which runs the camera client" : ""}.
           </>
         ),
       },
@@ -71,6 +94,7 @@ const SECTIONS: { group: string; items: QA[] }[] = [
         q: "Why won't the platform contact a camera I added?",
         a: (
           <>
+            {HOSTED && <>On a self-hosted deployment, which is where cameras are added: </>}
             Because it is not marked authorised. The connector refuses to open a connection
             to any camera without an authorisation record — a deliberate guard so nobody can
             point the platform at devices they have no right to access. Set{" "}
@@ -95,9 +119,10 @@ const SECTIONS: { group: string; items: QA[] }[] = [
         q: "Is there real Dubai traffic data without a camera agreement?",
         a: (
           <>
-            Yes. <strong className="text-paper">Dubai Pulse</strong> (dubaipulse.gov.ae) publishes
-            government open data including traffic incidents, under OAuth client credentials.
-            Set the key and secret in the backend environment and the connector will use it.
+            Yes — <strong className="text-paper">Dubai Pulse</strong> (dubaipulse.gov.ae) publishes
+            government open data, including traffic incidents, under OAuth client credentials.
+            The platform has settings reserved for a Dubai Pulse key and secret; the connector
+            that will use them is on the roadmap and not built yet.
           </>
         ),
       },
@@ -132,6 +157,7 @@ const SECTIONS: { group: string; items: QA[] }[] = [
         q: 'Why does routing sometimes say "no route found"?',
         a: (
           <>
+            {HOSTED && <>This answer is about a self-hosted deployment, where the network is ingested locally. </>}
             Almost always because the network in that area is incomplete — if the slip roads
             were not ingested, carriageways exist but nothing joins them. The{" "}
             <code className="font-mono text-paper">/api/network/graph</code> endpoint reports the
@@ -224,7 +250,7 @@ export default function FAQPage() {
                         {item.q}
                       </span>
                       <span
-                        className={`font-mono text-signal-amber shrink-0 mt-0.5 transition-transform duration-400 ease-out-expo ${
+                        className={`font-mono text-signal-amber shrink-0 mt-0.5 transition-transform duration-[400ms] ease-out-expo ${
                           isOpen ? "rotate-45" : ""
                         }`}
                       >
@@ -234,6 +260,12 @@ export default function FAQPage() {
                     {/* Grid-rows trick: animates height without needing a fixed
                         pixel value for content of unknown length. */}
                     <div
+                      id={uid}
+                      role="region"
+                      aria-labelledby={`${uid}-btn`}
+                      // A collapsed answer is only clipped, not removed: without
+                      // this its links stay in the tab order, invisible.
+                      {...(isOpen ? {} : ({ inert: "" } as object))}
                       className="grid transition-all duration-500 ease-out-expo"
                       style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
                     >

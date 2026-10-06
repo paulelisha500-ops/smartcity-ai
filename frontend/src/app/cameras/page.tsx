@@ -226,6 +226,13 @@ export default function CamerasPage() {
         </button>
         {guideOpen && (
           <div className="px-4 pb-4 text-xs text-paper/70 space-y-3 font-mono leading-relaxed">
+            {process.env.NEXT_PUBLIC_STATIC_API === "1" && (
+              <div className="border hairline rounded-md px-3 py-2 text-paper/60">
+                These steps apply to a self-hosted deployment, which runs the camera client.
+                This hosted edition has no server to connect a camera to; the sites above are
+                placeholders awaiting a device and an authorisation record.
+              </div>
+            )}
             <div>
               <span className="text-signal-amber">1. Authorisation.</span> The platform
               refuses to contact a camera unless its record is marked authorised. Dubai
@@ -254,10 +261,11 @@ export default function CamerasPage() {
               makes city-scale CV fall over.
             </div>
             <div>
-              <span className="text-signal-amber">5. Open data today.</span> Without a camera
-              agreement you can still pull real Dubai government traffic data from{" "}
-              <span className="text-paper">Dubai Pulse</span> (dubaipulse.gov.ae) — set{" "}
-              <code>SMARTCITY_DUBAI_PULSE_KEY</code> and <code>_SECRET</code>.
+              <span className="text-signal-amber">5. Open data.</span> Without a camera
+              agreement, Dubai government traffic data is published as open data by{" "}
+              <span className="text-paper">Dubai Pulse</span> (dubaipulse.gov.ae). The settings{" "}
+              <code>SMARTCITY_DUBAI_PULSE_KEY</code> and <code>_SECRET</code> are reserved for
+              a Dubai Pulse connector, which is on the roadmap and not built yet.
             </div>
           </div>
         )}

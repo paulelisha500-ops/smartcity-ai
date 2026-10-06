@@ -1,5 +1,6 @@
 "use client";
 
+import { asset } from "@/lib/asset";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -89,7 +90,7 @@ export default function LoginPage() {
       {/* ------------------------------------------------ imagery panel */}
       <div className="relative hidden lg:block border-r hairline">
         <Image
-          src="/emirates/abu-dhabi.webp"
+          src={asset("/emirates/abu-dhabi.webp")}
           alt="Abu Dhabi city"
           fill
           priority
@@ -196,7 +197,8 @@ export default function LoginPage() {
                     type="button"
                     onClick={() => {
                       setEmail(a.email);
-                      setPassword(ACCOUNT_PASSWORD);
+                      // A build with no default password must not wipe one the user typed.
+                      if (ACCOUNT_PASSWORD) setPassword(ACCOUNT_PASSWORD);
                       setError(null);
                     }}
                     className="group w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-blueprint-800/60 transition-colors duration-200"

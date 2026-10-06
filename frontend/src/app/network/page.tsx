@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import MapView from "@/components/LazyMap";
 import { api, describeError, BorderCrossingRow, NetworkStatus, RoadLinkGeo, PlacesStatus, PlaceResult } from "@/lib/api";
 import KPICard from "@/components/KPICard";
@@ -28,6 +28,12 @@ export default function NetworkPage() {
   // Gazetteer state
   const [places, setPlaces] = useState<PlacesStatus | null>(null);
   const [selected, setSelected] = useState<PlaceResult | null>(null);
+  // Bumped on every pick, so choosing the same place again flies back to it.
+  const [focusNonce, setFocusNonce] = useState(0);
+  // Only the latest road-layer request may draw; filters can be clicked faster
+  // than the larger layers load.
+  const geoRequest = useRef(0);
+  const importPoll = useRef<{ every?: ReturnType<typeof setInterval>; until?: ReturnType<typeof setTimeout> }>({});
   const [mapCenter, setMapCenter] = useState<[number, number]>([24.6, 54.6]);
   const [mapZoom, setMapZoom] = useState(7);
   const [importing, setImporting] = useState<string | null>(null);
@@ -46,19 +52,30 @@ export default function NetworkPage() {
   }, []);
 
   const loadGeo = useCallback(async () => {
+    const mine = ++geoRequest.current;
     try {
       const [r, b, c] = await Promise.all([
         api.roads({ highway: highway || undefined, limit: 1200, international_only: intlOnly }),
         api.borderCrossings(),
         api.corridors(),
       ]);
+      if (mine !== geoRequest.current) return;
       setRoads(r);
       setBorders(b);
       setCorridors(c.corridors || {});
-    } catch {
-      /* network not ingested yet — the empty state explains what to do */
+    } catch (e) {
+      // Only called once the network is known to be ingested, so a failure
+      // here is real and must be said.
+      if (mine === geoRequest.current) setNote(`Couldn't load the road layer: ${describeError(e)}`);
     }
   }, [highway, intlOnly]);
+
+  const stopImportPoll = useCallback(() => {
+    clearInterval(importPoll.current.every);
+    clearTimeout(importPoll.current.until);
+    importPoll.current = {};
+  }, []);
+  useEffect(() => stopImportPoll, [stopImportPoll]);
 
   const loadPlaces = useCallback(async () => {
     try {
@@ -85,6 +102,7 @@ export default function NetworkPage() {
 
   function goTo(r: PlaceResult) {
     setSelected(r);
+    setFocusNonce((n) => n + 1);
     setMapCenter([r.lat, r.lon]);
     setMapZoom(r.type === "street" ? 13 : 15);
   }
@@ -105,10 +123,11 @@ export default function NetworkPage() {
         return;
       }
       setNote(`${emirate} import started. Counts update as data lands.`);
-      const poll = setInterval(async () => {
-        await Promise.all([loadPlaces(), loadStatus()]);
-      }, 8000);
-      setTimeout(() => clearInterval(poll), 5 * 60 * 1000);
+      stopImportPoll();
+      importPoll.current = {
+        every: setInterval(() => { Promise.all([loadPlaces(), loadStatus()]).catch(() => {}); }, 8000),
+        until: setTimeout(stopImportPoll, 5 * 60 * 1000),
+      };
     } catch (e) {
       setNote(`Couldn't start the ${emirate} import: ${describeError(e)}`);
     } finally {
@@ -148,7 +167,7 @@ export default function NetworkPage() {
           disabled={busy}
           className="border hairline px-3 py-1.5 font-mono text-[11px] bg-signal-amber/80 text-blueprint-950 hover:bg-signal-amber disabled:opacity-40"
         >
-          {busy ? "INGESTING…" : status?.ingested ? "RE-INGEST" : "INGEST NETWORK"}
+          {busy ? "INGESTING…" : status && !status.ingested ? "INGEST NETWORK" : "RE-INGEST"}
         </button>
       </header>
 
@@ -161,7 +180,10 @@ export default function NetworkPage() {
       {/* Geocoder — searches the gazetteer and every named street at once. */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
-          <PlaceSearch onSelect={goTo} />
+          <PlaceSearch
+            onSelect={goTo}
+            emptyHint="Nothing found. Try a different spelling, or import places for the emirate below."
+          />
         </div>
         {selected && (
           <div className="blueprint-frame border hairline rounded-lg px-4 py-3 bg-blueprint-800/30">
@@ -238,14 +260,14 @@ export default function NetworkPage() {
         </div>
       </section>
 
-      {!status?.ingested && !busy && (
+      {status && !status.ingested && !busy && (
         <div className="blueprint-frame border hairline p-8 text-center">
           <div className="font-mono text-sm text-paper/70 mb-2">
             The real road network hasn&apos;t been downloaded yet.
           </div>
           <div className="font-mono text-[11px] text-paper/45 max-w-xl mx-auto">
-            INGEST NETWORK pulls every motorway, trunk, primary and secondary road in the
-            UAE from OpenStreetMap and stores the true geometry in PostGIS. Routing,
+            INGEST NETWORK pulls every motorway, trunk and primary road in the UAE from
+            OpenStreetMap and stores the true geometry in PostGIS. Routing,
             corridor design and this map all run off it afterwards.
           </div>
         </div>
@@ -296,7 +318,7 @@ export default function NetworkPage() {
               borders={borders}
               center={mapCenter}
               zoom={mapZoom}
-              focus={selected ? { lat: selected.lat, lon: selected.lon, label: selected.name } : undefined}
+              focus={selected ? { lat: selected.lat, lon: selected.lon, label: selected.name, nonce: focusNonce } : undefined}
             />
           </div>
         </div>

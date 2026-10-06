@@ -1,5 +1,6 @@
 "use client";
 
+import { asset } from "@/lib/asset";
 import Image from "next/image";
 import Link from "next/link";
 import PublicNav from "@/components/PublicNav";
@@ -32,7 +33,7 @@ const STACK = [
   ["Frontend", "Next.js · TypeScript · Tailwind · Leaflet · Chart.js"],
   ["Geospatial", "OpenStreetMap via Overpass · A* travel-time routing"],
   ["Cameras", "RTSP (RFC 2326) · ONVIF Profile S"],
-  ["Deployment", "Docker Compose"],
+  ["Deployment", "Docker Compose · GitHub Actions · Hugging Face Spaces · GitHub Pages"],
 ];
 
 export default function AboutPage() {
@@ -42,7 +43,7 @@ export default function AboutPage() {
 
       <section className="relative border-b hairline overflow-hidden">
         <div className="absolute inset-0">
-          <Image src="/emirates/sharjah.webp" alt="Sharjah corniche" fill className="object-cover" />
+          <Image src={asset("/emirates/sharjah.webp")} alt="Sharjah corniche" fill className="object-cover" />
           <div className="absolute inset-0 bg-gradient-to-r from-blueprint-950 via-blueprint-950/90 to-blueprint-950/45" />
           <div className="absolute inset-0 grid-bg opacity-50" />
         </div>
@@ -123,6 +124,13 @@ export default function AboutPage() {
 
       <section className="max-w-6xl mx-auto px-6 py-20">
         <SectionHead eyebrow="Stack" title="How it is built" />
+        {process.env.NEXT_PUBLIC_STATIC_API === "1" && (
+          <p className="text-paper/55 mt-4 max-w-2xl text-[15px] leading-relaxed">
+            This hosted edition runs without a server: the console&apos;s search, routing,
+            forecasting and analysis run in your browser over a published copy of the data.
+            Live ingestion, camera probing and stored reports need a self-hosted deployment.
+          </p>
+        )}
         <div className="mt-10 border hairline divide-y divide-blueprint-line/10">
           {STACK.map(([k, v]) => (
             <div key={k} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-6 px-5 py-4">

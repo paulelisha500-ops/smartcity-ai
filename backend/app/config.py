@@ -58,7 +58,8 @@ class Settings(BaseSettings):
     camera_discovery_enabled: bool = False
 
     # --- Dubai Pulse open-data (real RTA/Dubai government traffic feeds) ----
-    # Credentials are issued per-account by Dubai Pulse; without them the
+    # Reserved for a Dubai Pulse connector that is not built yet; nothing reads
+    # these today. Credentials are issued per-account by Dubai Pulse; without them the
     # connector reports "not configured" rather than failing the app.
     dubai_pulse_auth_url: str = (
         "https://api.dubaipulse.gov.ae/oauth/client_credential/accesstoken"

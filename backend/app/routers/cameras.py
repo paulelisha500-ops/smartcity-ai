@@ -239,8 +239,9 @@ def integration_guide(_user=Depends(require_any(*ANY_STAFF))):
         },
         "open_data_alternative": {
             "dubai_pulse": "https://www.dubaipulse.gov.ae",
-            "auth": "OAuth client_credentials; set SMARTCITY_DUBAI_PULSE_KEY and "
-                    "SMARTCITY_DUBAI_PULSE_SECRET, then call /api/cameras/open-data/traffic-incidents.",
+            "auth": "OAuth client_credentials. SMARTCITY_DUBAI_PULSE_KEY and "
+                    "SMARTCITY_DUBAI_PULSE_SECRET are reserved for a Dubai Pulse "
+                    "connector, which is not built yet.",
             "useful_datasets": ["dp_traffic_incidents", "rta_bus_routes", "rta_metro_lines"],
         },
         "performance": {

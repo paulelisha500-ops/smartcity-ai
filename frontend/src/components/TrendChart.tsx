@@ -10,9 +10,12 @@ import {
   LineElement,
   Tooltip,
   Filler,
+  Legend,
 } from "chart.js";
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
+// Legend must be registered: the options below configure one for every chart
+// with more than one line, and an unregistered plugin's options do nothing.
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler, Legend);
 
 export interface TrendSeries {
   label: string;
@@ -20,6 +23,8 @@ export interface TrendSeries {
   values: (number | null)[];
   /** Render against the right axis (for a series on a different scale, e.g. speed vs. congestion). */
   rightAxis?: boolean;
+  /** Shade under the line. Defaults to on for left-axis series. */
+  fill?: boolean;
 }
 
 /**
@@ -48,7 +53,7 @@ export default function TrendChart({
       pointHoverRadius: 3,
       borderWidth: 1.75,
       tension: 0.3,
-      fill: !s.rightAxis,
+      fill: s.fill ?? !s.rightAxis,
       yAxisID: s.rightAxis ? "y1" : "y",
     })),
   };

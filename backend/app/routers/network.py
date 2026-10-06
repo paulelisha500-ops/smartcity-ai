@@ -68,7 +68,7 @@ def ingest_network(background: BackgroundTasks,
                    classes: str | None = Query(
                        None,
                        description="Comma-separated OSM highway classes. "
-                                   "Default: motorway,trunk,primary,secondary + links.",
+                                   "Default: motorway,trunk,primary.",
                    ),
                    wait: bool = Query(False, description="Run inline instead of in the background"),
                    db: Session = Depends(get_db),

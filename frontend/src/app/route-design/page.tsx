@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import MapView from "@/components/LazyMap";
-import { api, describeError, DesignPreset, RouteDesign } from "@/lib/api";
+import { api, ApiError, describeError, DesignPreset, RouteDesign } from "@/lib/api";
 
 
 function scoreTone(score: number) {
@@ -16,7 +16,11 @@ export default function RouteDesignPage() {
   const [design, setDesign] = useState<RouteDesign | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lanes, setLanes] = useState(6);
+  // Kept as typed: parsing on every keystroke snapped an emptied box back to 6,
+  // so typing "8" produced "68".
+  const [lanesText, setLanesText] = useState("6");
+  const lanes = Number(lanesText);
+  const lanesValid = Number.isInteger(lanes) && lanes >= 2 && lanes <= 12;
   const [form, setForm] = useState({
     origin_name: "", origin_lat: "", origin_lon: "",
     destination_name: "", dest_lat: "", dest_lon: "",
@@ -30,13 +34,23 @@ export default function RouteDesignPage() {
     origin_lat: number; origin_lon: number; dest_lat: number; dest_lon: number;
     origin_name?: string; destination_name?: string;
   }) {
+    if (!lanesValid) {
+      setError("Lanes must be a whole number from 2 to 12.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       const result = await api.analyzeRoute({ ...payload, lanes });
       setDesign(result);
     } catch (e) {
-      setError(describeError(e, "Analysis failed.") + " If this keeps happening, make sure the road network is ingested (Road Network → INGEST NETWORK).");
+      // The ingest hint is for a server that cannot route; it does not apply
+      // to a rejected input, or to the hosted edition, which has no ingest.
+      const rejected = e instanceof ApiError && e.status < 500;
+      const hint = !rejected && process.env.NEXT_PUBLIC_STATIC_API !== "1"
+        ? " If this keeps happening, make sure the road network is ingested (Road Network → INGEST NETWORK)."
+        : "";
+      setError(describeError(e, "Analysis failed.") + hint);
     } finally {
       setBusy(false);
     }
@@ -113,8 +127,9 @@ export default function RouteDesignPage() {
               type="number"
               min={2}
               max={12}
-              value={lanes}
-              onChange={(e) => setLanes(parseInt(e.target.value) || 6)}
+              value={lanesText}
+              onChange={(e) => setLanesText(e.target.value)}
+              aria-invalid={!lanesValid}
               className="ml-2 w-16 bg-blueprint-800 border hairline px-2 py-1 text-xs font-mono text-paper focus:outline-none focus:border-signal-amber"
             />
           </label>
@@ -163,7 +178,14 @@ export default function RouteDesignPage() {
       )}
 
       {design && (
-        <section className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <section
+          aria-busy={busy}
+          className={`grid grid-cols-1 lg:grid-cols-5 gap-6 transition-opacity duration-300 ${
+            // While another corridor is being assessed this is the previous
+            // answer; fade it so it is not read as the new one.
+            busy ? "opacity-40" : ""
+          }`}
+        >
           <div className="lg:col-span-3 blueprint-frame border hairline h-[55vh] min-h-[300px] lg:h-[460px] overflow-hidden">
             <MapView
               route={design.existing_route.geometry as [number, number][]}
@@ -178,6 +200,9 @@ export default function RouteDesignPage() {
 
           <div className="lg:col-span-2 space-y-4">
             <div className="blueprint-frame border hairline p-4">
+              <div className="font-display text-base text-paper mb-3">
+                {design.origin.name} → {design.destination.name}
+              </div>
               <div className="flex items-baseline justify-between">
                 <div className="font-mono text-[10px] text-blueprint-line/60">
                   FEASIBILITY

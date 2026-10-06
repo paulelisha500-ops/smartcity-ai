@@ -64,8 +64,7 @@ class RAGPlannerService:
             return {
                 "answer": (
                     "I don't have enough current data to answer that precisely. "
-                    "Try asking about congestion, complaints, road condition, or "
-                    "recent accidents at a specific intersection or road."
+                    "Try asking about congestion, busy junctions, road condition or maintenance."
                 ),
                 "sources_used": [],
             }

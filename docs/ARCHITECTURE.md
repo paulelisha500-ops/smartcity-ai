@@ -4,7 +4,7 @@
 
 ```
 CCTV / Drone feeds ─┐
-Road inspection ──── ├─► Ingestion (Celery workers) ─► PostGIS / Mongo ─► FastAPI ─► Frontend / Mobile
+Road inspection ──── ├─► Ingestion (Celery workers) ─► PostGIS ─► FastAPI ─► Frontend
 Citizen reports ────┘                                        │
                                                                ▼
                                                      Redis (cache, pub/sub, WS)
@@ -19,9 +19,10 @@ Citizen reports ────┘                                        │
   road segments, intersections, incidents, complaints, sensor readings. PostGIS
   gives us spatial joins ("complaints within 200m of this intersection") and
   spatial indexes (GiST) that a plain relational DB can't do efficiently.
-- **MongoDB** — flexible, semi-structured data: raw model outputs, CV detection
-  frames/metadata, LLM conversation logs — data whose shape changes as models
-  evolve, where a rigid schema would slow iteration.
+- **MongoDB** (planned; not in the default stack) — for flexible,
+  semi-structured data such as raw model outputs, CV detection metadata and
+  LLM conversation logs, whose shape changes as models evolve. No code path
+  uses it yet; `docker compose --profile full up -d` starts it.
 - **Redis** — hot cache for dashboard tiles/KPIs, Celery broker, and pub/sub for
   WebSocket live updates (e.g., pushing a new congestion score to every open
   dashboard without polling).
@@ -45,10 +46,10 @@ config (`SMARTCITY_MODEL_MODE=mock|production`). This means:
 
 Traffic officers and planners need live state, not just request/response. The
 `/ws/live` WebSocket channel pushes:
-- Congestion score updates per intersection (every 30s in mock mode, per-frame
-  in production CV mode)
-- New high-priority complaints as they're classified
-- Emergency route changes
+- Congestion score updates per intersection (a modelled tick every 5s in mock
+  mode; per-frame output once a CV pipeline is attached)
+- Every new complaint, as soon as it is classified
+- Camera status changes, from a manual test or the scheduled health sweep
 
 ## Auth & roles
 
@@ -64,7 +65,6 @@ government SSO via SAML) later.
 road_segment(id, geom LINESTRING, name, lanes, speed_limit, condition_score)
 intersection(id, geom POINT, name)
 traffic_reading(id, intersection_id, ts, vehicle_count, avg_speed, congestion_score, queue_length)
-incident(id, geom POINT, type, severity, ts, source)
 complaint(id, geom POINT, ts, text, category, sentiment, priority, status, department)
 road_damage(id, geom POINT, ts, damage_type, severity, image_ref)
 ```
@@ -74,7 +74,7 @@ road_damage(id, geom POINT, ts, damage_type, severity, image_ref)
 | Service | Mock implementation | Production swap-in |
 |---|---|---|
 | `TrafficCVService` | Deterministic pseudo-random counts seeded by intersection+time | YOLOv8 + ByteTrack on RTSP/video input, GPU inference workers |
-| `RoadDamageService` | Heuristic severity from a seeded distribution | YOLO detection + SegFormer segmentation on drone/vehicle imagery |
+| `RoadDamageCVService` | Heuristic severity from a seeded distribution | YOLO detection + SegFormer segmentation on drone/vehicle imagery |
 | `ComplaintNLPService` | Rule-based classifier + keyword sentiment + regex/gazetteer location extraction | Fine-tuned transformer classifier + sentence-transformer embeddings + NER model |
 | `ForecastingService` | Seasonal moving average + weekday/hour profile | LSTM / Temporal Fusion Transformer trained on historical sensor data |
 | `RAGPlannerService` | In-memory TF-IDF-style retrieval over structured city facts | LangChain/LangGraph agent + FAISS vector store over GIS docs, policy PDFs, historical reports, live DB queries as tools |
