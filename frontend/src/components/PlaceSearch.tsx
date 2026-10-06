@@ -21,10 +21,13 @@ export default function PlaceSearch({
   onSelect,
   placeholder = "Search a place, building or street…",
   emirate,
+  emptyHint = "Nothing found. Try a different spelling.",
 }: {
   onSelect: (r: PlaceResult) => void;
   placeholder?: string;
   emirate?: string;
+  /** Shown when a search matches nothing. Callers that can act on it say more. */
+  emptyHint?: string;
 }) {
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<PlaceResult[]>([]);
@@ -41,12 +44,19 @@ export default function PlaceSearch({
   const chosen = useRef<string | null>(null);
 
   useEffect(() => {
+    // Any change to the box retires the request in flight, including clearing
+    // it or picking a result; otherwise a late answer reopens the list.
+    const mine = ++seq.current;
     if (term.trim().length < 2) {
       setResults([]);
+      setOpen(false);
+      setBusy(false);
       return;
     }
-    if (term === chosen.current) return;
-    const mine = ++seq.current;
+    if (term === chosen.current) {
+      setBusy(false);
+      return;
+    }
     const t = setTimeout(async () => {
       setBusy(true);
       setFailed(false);
@@ -58,7 +68,8 @@ export default function PlaceSearch({
           setActive(-1);
         }
       } catch {
-        if (mine === seq.current) { setResults([]); setFailed(true); }
+        // Open the panel, or the "unavailable" message below has nowhere to show.
+        if (mine === seq.current) { setResults([]); setFailed(true); setOpen(true); }
       } finally {
         if (mine === seq.current) setBusy(false);
       }
@@ -83,10 +94,13 @@ export default function PlaceSearch({
   }
 
   function onKey(e: React.KeyboardEvent) {
+    // Enter in this box picks a place; it must never submit a form the box
+    // happens to sit in — and the list is not open yet while results load.
+    if (e.key === "Enter") e.preventDefault();
     if (!open || results.length === 0) return;
     if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => Math.min(a + 1, results.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
-    else if (e.key === "Enter") { e.preventDefault(); choose(results[active >= 0 ? active : 0]); }
+    else if (e.key === "Enter") choose(results[active >= 0 ? active : 0]);
     else if (e.key === "Escape") setOpen(false);
   }
 
@@ -118,10 +132,11 @@ export default function PlaceSearch({
       </div>
 
       {open && results.length > 0 && (
-        <ul id={listId} role="listbox" aria-label="Search results" className="absolute z-[1000] mt-1 w-full max-h-80 overflow-y-auto rounded-md border hairline bg-blueprint-950/97 backdrop-blur-xl shadow-2xl">
+        <ul id={listId} role="listbox" aria-label="Search results" className="absolute z-[1000] mt-1 w-full max-h-80 overflow-y-auto rounded-md border hairline bg-blueprint-950/95 backdrop-blur-xl shadow-2xl">
           {results.map((r, i) => (
             <li key={`${r.type}-${r.id ?? r.name}-${i}`} id={`${uid}-opt-${i}`} role="option" aria-selected={i === active}>
               <button
+                type="button"
                 tabIndex={-1}
                 onMouseEnter={() => setActive(i)}
                 onClick={() => choose(r)}
@@ -151,10 +166,8 @@ export default function PlaceSearch({
       )}
 
       {open && !busy && term.trim().length >= 2 && results.length === 0 && (
-        <div role="status" className="absolute z-[1000] mt-1 w-full rounded-md border hairline bg-blueprint-950/97 backdrop-blur-xl px-3 py-3 font-mono text-[11px] text-paper/45">
-          {failed
-            ? "Search is unavailable right now. Check your connection and try again."
-            : "Nothing found. Try a different spelling, or import places for this emirate on the UAE Road Network page."}
+        <div role="status" className="absolute z-[1000] mt-1 w-full rounded-md border hairline bg-blueprint-950/95 backdrop-blur-xl px-3 py-3 font-mono text-[11px] text-paper/45">
+          {failed ? "Search is unavailable right now. Check your connection and try again." : emptyHint}
         </div>
       )}
     </div>

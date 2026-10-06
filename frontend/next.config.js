@@ -7,6 +7,9 @@ const nextConfig = {
   ...(process.env.NEXT_PUBLIC_STATIC_API === "1" && {
     output: "export",
     images: { unoptimized: true },
+    // Set when the host serves the site under a path rather than at its root
+    // (GitHub Pages: /<repository>).
+    basePath: process.env.NEXT_PUBLIC_BASE_PATH || undefined,
   }),
 
   webpack: (config, { dev }) => {

@@ -1,0 +1,100 @@
+name: Pages
+
+# Publishes the hosted edition to GitHub Pages — a second, independent copy of
+# the site that runs on the Hugging Face Space. Pages serves a project under
+# /<repository>, so the site is built with that base path.
+#
+# The data set is not in git (see docs/DEPLOYMENT.md). It is pulled from the
+# Space, which is where scripts/deploy_space.py publishes it.
+
+on:
+  push:
+    branches: [main]
+  # Pull requests build and test the Pages copy without publishing it, so a
+  # change that breaks it under the base path is caught before it reaches main.
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  # Per branch, so a pull request's run never cancels a deploy from main.
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Fetch the data set
+        run: |
+          pip install --quiet huggingface_hub
+          python - <<'PY'
+          from huggingface_hub import snapshot_download
+
+          snapshot_download(
+              repo_id="Elisha622/smartcity-ai", repo_type="space",
+              allow_patterns=["data/**"], local_dir="frontend/public",
+          )
+          PY
+          rm -rf frontend/public/.cache
+          test -f frontend/public/data/manifest.json.gz
+
+      - name: Build the site
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build:static
+
+      # The site is not published unless every control on it works.
+      - name: End-to-end tests
+        working-directory: frontend
+        env:
+          E2E_CHANNEL: chromium
+          HOST_AS: pages
+          BASE_PATH: ${{ env.NEXT_PUBLIC_BASE_PATH }}
+        run: |
+          npx playwright-core install --with-deps chromium
+          node scripts/serve-static.mjs 7861 &
+          for attempt in $(seq 1 30); do
+            curl -sf "http://127.0.0.1:7861${BASE_PATH}/" > /dev/null && break
+            sleep 1
+          done
+          node e2e/suite.mjs "http://127.0.0.1:7861${BASE_PATH}"
+
+      - uses: actions/configure-pages@v5
+        if: github.event_name != 'pull_request'
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: frontend/out
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

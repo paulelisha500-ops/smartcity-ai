@@ -6,51 +6,7 @@ import { useEffect, useState } from "react";
 import BrandMark from "@/components/BrandMark";
 import { api } from "@/lib/api";
 import { getSession, clearSession, ROLE_LABELS } from "@/lib/auth";
-
-type NavItem = { href: string; label: string; code: string; roles?: string[] };
-
-// Every backend router this nav points at has its own, authoritative role
-// check (see the auth comments in each app/routers/*.py) — this list only
-// decides what each role *sees a reason to click on*. Omitting `roles` shows
-// the item to every staff role (public_user never reaches this shell at all;
-// see homeRouteForRole in lib/auth.ts). Restricted items are the specialist
-// tools: only OPERATORS (admin, traffic_officer) run camera and dispatch
-// operations day to day, and only PLANNERS (admin, city_planner) do network
-// ingestion, infrastructure editing and corridor design — matching the
-// OPERATORS/PLANNERS groups the backend itself enforces.
-const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
-  {
-    group: "Operations",
-    items: [
-      { href: "/", label: "Digital Twin", code: "M6" },
-      { href: "/traffic", label: "Traffic Analysis", code: "M1/M4", roles: ["admin", "traffic_officer", "city_planner"] },
-      { href: "/cameras", label: "CCTV Network", code: "M9", roles: ["admin", "traffic_officer"] },
-      { href: "/dispatch", label: "Emergency Dispatch", code: "M7", roles: ["admin", "traffic_officer"] },
-    ],
-  },
-  {
-    group: "City services",
-    items: [
-      { href: "/complaints", label: "Citizen Complaints", code: "M3" },
-      { href: "/maintenance", label: "Road Maintenance", code: "M2", roles: ["admin", "maintenance_department", "city_planner"] },
-    ],
-  },
-  {
-    group: "Planning",
-    items: [
-      { href: "/network", label: "UAE Road Network", code: "M10", roles: ["admin", "city_planner"] },
-      { href: "/infrastructure", label: "Bridges & Projects", code: "M11", roles: ["admin", "city_planner"] },
-      { href: "/route-design", label: "New Route Design", code: "M12", roles: ["admin", "city_planner"] },
-      { href: "/planner", label: "AI City Planner", code: "M5", roles: ["admin", "city_planner"] },
-    ],
-  },
-  {
-    group: "Reports",
-    items: [
-      { href: "/analytics", label: "Government Analytics", code: "M8" },
-    ],
-  },
-];
+import { NAV_GROUPS } from "@/lib/nav";
 
 export default function Sidebar({ open = false, onNavigate }: { open?: boolean; onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -75,8 +31,11 @@ export default function Sidebar({ open = false, onNavigate }: { open?: boolean; 
       aria-label="Main navigation"
       // Below lg the sidebar is an off-canvas drawer: a fixed 256px column left
       // ~120px for content on a 375px phone. From lg up it is the static column.
-      className={`fixed inset-y-0 left-0 z-50 w-64 max-w-[85vw] shrink-0 border-r hairline bg-blueprint-950 lg:bg-blueprint-950/60 flex flex-col transition-transform duration-300 lg:static lg:translate-x-0 ${
-        open ? "translate-x-0" : "-translate-x-full"
+      // Closed, the drawer is also invisible below lg: moved off-screen alone,
+      // its links stayed in the tab order with no visible focus. Visibility
+      // transitions with the slide, so it hides once the slide has finished.
+      className={`fixed inset-y-0 left-0 z-50 w-64 max-w-[85vw] shrink-0 border-r hairline bg-blueprint-950 lg:bg-blueprint-950/60 flex flex-col transition-[transform,visibility] duration-300 lg:static lg:translate-x-0 lg:visible ${
+        open ? "translate-x-0 visible" : "-translate-x-full invisible"
       }`}
     >
       <div className="px-5 py-5 border-b hairline">

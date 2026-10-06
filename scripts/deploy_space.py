@@ -41,6 +41,10 @@ SPACE = os.environ.get("HF_SPACE", "Elisha622/smartcity-ai")
 BATCH_BYTES = 8 * 1024 * 1024
 BATCH_FILES = 400
 
+# The Hub stores any file over 10 MB in LFS however it is uploaded, so a file
+# that size can only be compared by its LFS hash.
+LFS_ONLY_BYTES = 10 * 1024 * 1024
+
 
 def site_files() -> dict[str, Path]:
     """Everything in the export except the data set, keyed by repo path."""
@@ -66,16 +70,20 @@ def publish_data(api: HfApi) -> None:
     try:
         for entry in api.list_repo_tree(SPACE, repo_type="space", path_in_repo="data", recursive=True):
             if isinstance(entry, RepoFile):
-                # Ordinary files report their git blob id; LFS files, the sha256
-                # of the content. Accept either so an earlier LFS upload is
-                # replaced rather than mistaken for current.
+                # Ordinary files are compared by git blob id. The data set is
+                # published as ordinary files (see BATCH_BYTES), so an LFS copy
+                # of a small file is a leftover to replace; a large one cannot
+                # be anything else (LFS_ONLY_BYTES).
                 remote[entry.path] = {entry.blob_id} if not entry.lfs else {f"lfs:{entry.lfs.sha256}"}
     except EntryNotFoundError:
         pass
 
     def unchanged(name: str, path: Path) -> bool:
         payload = path.read_bytes()
-        return git_blob_sha(payload) in remote.get(name, set())
+        current = {git_blob_sha(payload)}
+        if len(payload) > LFS_ONLY_BYTES:
+            current.add(f"lfs:{hashlib.sha256(payload).hexdigest()}")
+        return bool(current & remote.get(name, set()))
 
     changed = [name for name, path in local.items() if not unchanged(name, path)]
     stale = [name for name in remote if name not in local]
@@ -121,8 +129,14 @@ def main() -> None:
     api.create_repo(SPACE, repo_type="space", space_sdk="static", exist_ok=True)
 
     if args.data:
-        if not (DATA / "manifest.json.gz").exists():
-            raise SystemExit("frontend/public/data is missing — run scripts/snapshot_static.py first.")
+        # Publishing removes whatever the local snapshot lacks, so a snapshot
+        # that stopped part-way would take the published tiles and graph with it.
+        required = ["manifest.json.gz", "roads/index.json.gz", "routing/graph.bin.gz",
+                    "search/places.json.gz", "search/streets.json.gz"]
+        missing = [name for name in required if not (DATA / name).exists()]
+        if missing:
+            raise SystemExit(f"the snapshot in frontend/public/data is incomplete (missing {missing}) — "
+                             "re-run scripts/snapshot_static.py.")
         publish_data(api)
 
     local = site_files()

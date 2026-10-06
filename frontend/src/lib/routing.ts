@@ -11,7 +11,7 @@
  * needs it.
  */
 import type { Project, RouteDesign } from "@/lib/api";
-import { fetchData, haversineKm, recorded } from "@/lib/static-api";
+import { fetchData, haversineKm, pyFloat, recorded, round } from "@/lib/static-api";
 
 const SCALE = 100_000;
 
@@ -190,6 +190,9 @@ interface RouteResult {
   geometry?: [number, number][];
   distance_m?: number;
   eta_seconds?: number;
+  /** How far each requested point was from the junction the route starts or ends at. */
+  origin_snap_m?: number;
+  destination_snap_m?: number;
 }
 
 /**
@@ -253,8 +256,8 @@ function astar(g: Graph, start: number, goal: number, maxExpansions = 400_000): 
   return {
     reachable: true,
     geometry,
-    distance_m: Math.round(distance * 10) / 10,
-    eta_seconds: Math.round(cost[goal] * 10) / 10,
+    distance_m: round(distance, 1),
+    eta_seconds: round(cost[goal], 1),
   };
 }
 
@@ -265,7 +268,23 @@ function routeBetween(g: Graph, origin: [number, number], destination: [number, 
   if (start < 0 || goal < 0) {
     return { reachable: false, error: "could not snap coordinates to the road network" };
   }
-  return astar(g, start, goal) ?? { reachable: false, error: "no route found between these points" };
+  const result = astar(g, start, goal);
+  if (!result) return { reachable: false, error: "no route found between these points" };
+  result.origin_snap_m = round(haversineKm(origin[0], origin[1], nodeLat(g, start), nodeLon(g, start)) * 1000, 1);
+  result.destination_snap_m = round(
+    haversineKm(destination[0], destination[1], nodeLat(g, goal), nodeLon(g, goal)) * 1000, 1,
+  );
+  return result;
+}
+
+/** Route two coordinates over the network — `route_between` in road_graph.py. */
+export async function route(
+  origin: [number, number], destination: [number, number], { emergency = false } = {},
+): Promise<RouteResult> {
+  const result = routeBetween(await loadGraph(), origin, destination);
+  // Blue-light factor: emergency vehicles run ~25% under civilian time.
+  if (emergency && result.reachable) result.eta_seconds = round((result.eta_seconds as number) * 0.75, 1);
+  return result;
 }
 
 /* ------------------------------------------------------ corridor assessment */
@@ -284,13 +303,6 @@ const UNIT_COST_AED_M_PER_KM: Record<string, number> = {
 };
 const CAPACITY_PER_LANE_VPH = 1800;
 
-const round = (value: number, places: number) => {
-  const f = 10 ** places;
-  return Math.round(value * f) / f;
-};
-/** Python prints 40.0 where JavaScript prints 40; the rationale text follows the API. */
-const pyFloat = (value: number | null) =>
-  value === null ? "None" : Number.isInteger(value) ? value.toFixed(1) : String(value);
 
 let strategicGrid: Map<string, number[]> | undefined;
 

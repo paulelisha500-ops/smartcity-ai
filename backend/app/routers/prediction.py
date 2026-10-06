@@ -1,15 +1,62 @@
-from fastapi import APIRouter
+import logging
+from datetime import datetime, timedelta
 
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models.traffic import TrafficReading
 from app.services.forecasting import forecasting_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/prediction", tags=["prediction"])
 
+# How far back the seasonal baseline looks: two weeks gives every hour of the
+# day fourteen samples without reaching into a different season.
+HISTORY_DAYS = 14
+
 
 @router.get("/intersection/{intersection_id}")
-def forecast_intersection(intersection_id: int, horizon_hours: int = 24):
-    """Answers: 'forecast tomorrow's congestion / rush-hour hotspots.'"""
-    forecast = forecasting_service.forecast_intersection(intersection_id, historical_readings=[], horizon_hours=horizon_hours)
-    return {"intersection_id": intersection_id, "horizon_hours": horizon_hours, "forecast": forecast}
+def forecast_intersection(
+    intersection_id: int,
+    horizon_hours: int = Query(24, ge=1, le=168),
+    db: Session = Depends(get_db),
+):
+    """
+    Answers: 'forecast tomorrow's congestion / rush-hour hotspots.'
+
+    The baseline is built from the readings actually stored for this junction.
+    It used to be called with no history at all, so every forecast came from
+    the fixed fallback profile and ignored what had been recorded. The typical
+    profile still covers a junction with nothing stored yet (or an unreachable
+    database), and any hour of the day the stored readings do not cover;
+    `basis` says whether stored readings were used at all.
+    """
+    history: list[dict] = []
+    try:
+        rows = (
+            db.query(TrafficReading.ts, TrafficReading.congestion_score)
+            .filter(TrafficReading.intersection_id == intersection_id)
+            .filter(TrafficReading.ts >= datetime.utcnow() - timedelta(days=HISTORY_DAYS))
+            .all()
+        )
+        history = [{"ts": ts, "congestion_score": score} for ts, score in rows if score is not None]
+    except SQLAlchemyError:
+        db.rollback()
+        logger.warning("forecast: could not read history for intersection %s", intersection_id, exc_info=True)
+
+    forecast = forecasting_service.forecast_intersection(
+        intersection_id, historical_readings=history, horizon_hours=horizon_hours
+    )
+    return {
+        "intersection_id": intersection_id,
+        "horizon_hours": horizon_hours,
+        "forecast": forecast,
+        "basis": "history" if history else "typical_pattern",
+        "history_points": len(history),
+    }
 
 
 @router.get("/event-impact")

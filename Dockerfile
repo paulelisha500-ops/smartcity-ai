@@ -32,7 +32,8 @@ RUN cd frontend && npm install && npm run build
 
 COPY --chown=user backend/app backend/app
 COPY --chown=user deploy/container deploy/container
-RUN chmod +x deploy/container/entrypoint.sh && chown -R user:user /home/user
+# pgdata exists in the image so a volume mounted there inherits user ownership.
+RUN chmod +x deploy/container/entrypoint.sh && mkdir -p /home/user/pgdata && chown -R user:user /home/user
 
 USER user
 ENV SMARTCITY_POSTGRES_URL=postgresql://smartcity:smartcity@127.0.0.1:5432/smartcity \

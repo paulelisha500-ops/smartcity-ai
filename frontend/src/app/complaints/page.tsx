@@ -17,7 +17,12 @@ export default function ComplaintsPage() {
   const [error, setError] = useState<string | null>(null);
 
   function refresh() {
-    api.complaints().then(setComplaints).catch((e) => setError(describeError(e)));
+    api.complaints()
+      .then((rows) => {
+        setComplaints(rows);
+        setError(null);
+      })
+      .catch((e) => setError(describeError(e)));
   }
 
   useEffect(refresh, []);
@@ -31,7 +36,7 @@ export default function ComplaintsPage() {
         </p>
       </header>
 
-      <ErrorBanner message={error} />
+      <ErrorBanner message={error} onRetry={refresh} />
 
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">

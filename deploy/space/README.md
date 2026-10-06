@@ -26,11 +26,12 @@ This Space is a static site — no server process. The console is the same
 Next.js application as the self-hosted platform, with its API calls answered
 in the browser:
 
-- **Recorded** — the road network, gazetteer, project register, camera fleet
-  and dispatch routes are the API's own output, published as data files.
+- **Recorded** — the road network, gazetteer, project register and camera
+  fleet are the API's own output, published as data files.
 - **Computed** — place search, reverse geocoding, complaint analysis, the
-  planner, the traffic model and corridor design (A\* over a 135,882-node
-  routing graph) are ports of the backend services running client-side.
+  planner, the traffic model and its forecast, emergency dispatch and corridor
+  design (both A\* over a 135,882-node routing graph) are ports of the backend
+  services running client-side.
 
 Reports you file stay in your browser for the visit; nothing is stored
 server-side. The full platform, with PostGIS, live ingestion and the
@@ -40,5 +41,6 @@ RTSP/ONVIF camera client, is in the source repository.
 
 - Code: <https://github.com/paulelisha500-ops/smartcity-ai>
 - This Space is built and published by GitHub Actions on every push to `main`.
+- The same site is also published at <https://paulelisha500-ops.github.io/smartcity-ai/>.
 
 Map data © OpenStreetMap contributors. Basemap tiles © Esri.

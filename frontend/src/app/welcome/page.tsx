@@ -1,5 +1,6 @@
 "use client";
 
+import { asset } from "@/lib/asset";
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -58,9 +59,10 @@ export default function WelcomePage() {
 
       {/* ---------------------------------------------------------- hero */}
       <section className="relative min-h-[92vh] flex items-center border-b hairline">
-        <div className="absolute inset-0">
-          <Image src="/emirates/dubai.webp" alt="Dubai skyline" fill priority className="object-cover scale-105" />
-          <div className="absolute inset-0 bg-gradient-to-r from-blueprint-950 via-blueprint-950/92 to-blueprint-950/35" />
+        {/* Clipped: the photograph is scaled 105% and would bleed below the hero. */}
+        <div className="absolute inset-0 overflow-hidden">
+          <Image src={asset("/emirates/dubai.webp")} alt="Dubai skyline" fill priority className="object-cover scale-105" />
+          <div className="absolute inset-0 bg-gradient-to-r from-blueprint-950 via-blueprint-950/90 to-blueprint-950/35" />
           <div className="absolute inset-0 bg-gradient-to-t from-blueprint-950 via-transparent to-blueprint-950/60" />
           <div className="absolute inset-0 grid-bg opacity-60" />
         </div>

@@ -50,14 +50,15 @@ call time.
 low-resolution sub-stream because a vehicle is just as detectable at 640×480,
 and decoding 4MP per camera is what makes city-scale CV fall over.
 
-**Open data alternative.** Without a camera agreement, real Dubai government
-traffic data is available from [Dubai Pulse](https://www.dubaipulse.gov.ae)
-(OAuth `client_credentials`; set `SMARTCITY_DUBAI_PULSE_KEY` / `_SECRET`).
+**Open data alternative.** Without a camera agreement, Dubai government traffic
+data is published as open data by [Dubai Pulse](https://www.dubaipulse.gov.ae)
+(OAuth `client_credentials`). `SMARTCITY_DUBAI_PULSE_KEY` / `_SECRET` are
+reserved for a connector that is on the roadmap and not built yet.
 
 ## Module 10 — UAE Road Network & Borders
 
-`POST /api/network/ingest` pulls every motorway, trunk, primary and secondary
-road in the UAE from OpenStreetMap via the Overpass API and stores true
+`POST /api/network/ingest` pulls every motorway, trunk and primary road in the
+UAE (pass `?classes=` for more) from OpenStreetMap via the Overpass API and stores true
 `LINESTRING` geometry in PostGIS. Border posts come from OSM
 `barrier=border_control`, backed by a curated list of the major named
 crossings. Links within 8 km of a crossing are flagged `is_international`.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import MapView from "@/components/LazyMap";
 import { api, describeError, Facility } from "@/lib/api";
 
@@ -28,11 +28,20 @@ export default function DispatchPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Only the latest lookup may write: switching incident or service while one
+  // is in flight would otherwise let the slower answer win.
+  const lookup = useRef(0);
+
   async function dispatch(lat: number, lon: number, facilityType: string) {
+    const mine = ++lookup.current;
     setBusy(true);
     setError(null);
+    // The previous incident's answer is not this one's.
+    setRecommended(null);
+    setCandidates([]);
     try {
       const res = await api.nearestFacility(lat, lon, facilityType);
+      if (mine !== lookup.current) return;
       setCandidates(res.candidates || []);
       setRecommended(res.recommended);
       setRealNetwork(res.routed_on_real_network);
@@ -42,9 +51,9 @@ export default function DispatchPage() {
         );
       }
     } catch (e) {
-      setError(describeError(e, "Dispatch lookup failed."));
+      if (mine === lookup.current) setError(describeError(e, "Dispatch lookup failed."));
     } finally {
-      setBusy(false);
+      if (mine === lookup.current) setBusy(false);
     }
   }
 
@@ -70,6 +79,7 @@ export default function DispatchPage() {
               <button
                 key={p.name}
                 onClick={() => setIncident(p)}
+                aria-pressed={incident.name === p.name}
                 className={`border hairline px-3 py-1.5 font-mono text-[10px] ${
                   incident.name === p.name
                     ? "border-signal-red text-paper bg-blueprint-800/60"
@@ -85,6 +95,7 @@ export default function DispatchPage() {
         <div>
           <div className="font-mono text-[10px] text-blueprint-line/60 mb-1">SERVICE</div>
           <select
+            aria-label="Service"
             value={type}
             onChange={(e) => setType(e.target.value)}
             className="bg-blueprint-800 border hairline px-2 py-1.5 text-xs font-mono text-paper focus:outline-none focus:border-signal-amber"
@@ -106,20 +117,7 @@ export default function DispatchPage() {
         <div className="lg:col-span-3 blueprint-frame border hairline h-[55vh] min-h-[300px] lg:h-[460px] overflow-hidden">
           <MapView
             route={recommended?.geometry as [number, number][] | undefined}
-            traffic={[
-              {
-                intersection_id: -1,
-                intersection_name: `INCIDENT — ${incident.name}`,
-                lat: incident.lat,
-                lon: incident.lon,
-                ts: new Date().toISOString(),
-                vehicle_count: 0,
-                avg_speed_kmh: 0,
-                congestion_score: 100,
-                queue_length_m: 0,
-                lane_occupancy_pct: 0,
-              },
-            ]}
+            incident={{ lat: incident.lat, lon: incident.lon, label: `Incident — ${incident.name}` }}
             center={[incident.lat, incident.lon]}
             zoom={11}
           />

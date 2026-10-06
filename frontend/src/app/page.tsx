@@ -144,7 +144,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div role="status" aria-live="polite" className="flex items-center gap-2 font-mono text-[11px]" title={
-          liveConnected ? "Connected to /ws/live" : "Reconnecting to /ws/live…"
+          liveConnected ? "Live feed connected" : "Reconnecting to the live feed…"
         }>
           <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${
             liveConnected ? "bg-signal-green animate-pulse" : "bg-blueprint-line/40"
@@ -157,8 +157,14 @@ export default function DashboardPage() {
 
       {connError && (
         <div role="alert" className="border border-signal-red/40 bg-signal-red/10 text-signal-red text-xs font-mono px-4 py-3 rounded-md">
-          Can&apos;t reach the backend API. Run <code>docker compose up -d</code> and confirm
-          NEXT_PUBLIC_API_URL points to it.
+          {process.env.NEXT_PUBLIC_STATIC_API === "1" ? (
+            <>Can&apos;t load the city data. Check your connection and reload the page.</>
+          ) : (
+            <>
+              Can&apos;t reach the backend API. Run <code>docker compose up -d</code> and confirm
+              NEXT_PUBLIC_API_URL points to it.
+            </>
+          )}
         </div>
       )}
 

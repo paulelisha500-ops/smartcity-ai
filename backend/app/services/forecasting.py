@@ -33,18 +33,16 @@ class ForecastingService:
             # -----------------------------------------------------------
             raise NotImplementedError("Implement forecast_intersection() with LSTM/TFT here.")
 
-        if not historical_readings:
-            historical_readings = self._synthetic_history(intersection_id)
-
-        by_hour: dict[int, list[float]] = {}
-        for r in historical_readings:
-            by_hour.setdefault(r["ts"].hour, []).append(r["congestion_score"])
+        # An hour of the day with no stored readings takes the typical profile,
+        # so a junction recorded for only part of the day keeps its rush hours.
+        by_hour = self._by_hour(historical_readings)
+        typical = self._by_hour(self._synthetic_history(intersection_id))
 
         now = datetime.utcnow()
         forecast = []
         for i in range(horizon_hours):
             t = now + timedelta(hours=i + 1)
-            hour_values = by_hour.get(t.hour, [40.0])
+            hour_values = by_hour.get(t.hour) or typical.get(t.hour, [40.0])
             predicted = mean(hour_values)
             # event/holiday impact would be added here as a covariate adjustment
             forecast.append({
@@ -54,6 +52,13 @@ class ForecastingService:
                 "confidence_high": round(min(100, predicted + 12), 1),
             })
         return forecast
+
+    @staticmethod
+    def _by_hour(readings: list[dict]) -> dict[int, list[float]]:
+        by_hour: dict[int, list[float]] = {}
+        for r in readings:
+            by_hour.setdefault(r["ts"].hour, []).append(r["congestion_score"])
+        return by_hour
 
     @staticmethod
     def _synthetic_history(intersection_id: int) -> list[dict]:

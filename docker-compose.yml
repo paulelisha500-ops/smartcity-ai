@@ -24,6 +24,10 @@ services:
 
   backend:
     build: ./backend
+    # Settings and camera credentials from a local .env (see .env.example).
+    env_file:
+      - path: .env
+        required: false
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8001:8000"
@@ -43,6 +47,10 @@ services:
 
   celery_worker:
     build: ./backend
+    # Settings and camera credentials from a local .env (see .env.example).
+    env_file:
+      - path: .env
+        required: false
     # Two workers instead of the default (one per CPU) — this stack shares a
     # laptop, and the task load is bursty ingest work, not steady throughput.
     # -B embeds the Beat scheduler in this same process. A dedicated `celery

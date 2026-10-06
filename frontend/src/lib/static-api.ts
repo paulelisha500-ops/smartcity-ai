@@ -17,8 +17,8 @@
  *    server returns for them.
  */
 import type {
-  Complaint, CongestionHistoryPoint, DesignPreset, Hotspot, KPIs, RoadDamagePoint, RoadLinkGeo,
-  TrafficReading,
+  Complaint, ComplaintHistoryPoint, CongestionHistoryPoint, DesignPreset, Hotspot, KPIs,
+  RoadDamagePoint, RoadLinkGeo, TrafficReading,
 } from "@/lib/api";
 import type { LiveEvent } from "@/lib/live";
 
@@ -85,10 +85,26 @@ export function warm(): void {
   for (const key of FIRST_SCREEN) recorded(key).catch(() => {});
 }
 
-const round = (value: number, places: number) => {
-  const f = 10 ** places;
-  return Math.round(value * f) / f;
-};
+/**
+ * Python's round(): the nearest value at that precision, and an exact tie goes
+ * to the even digit. `Math.round(x * 10) / 10` rounds ties up and rounds the
+ * scaled product rather than the number itself, which put the ports 0.1 away
+ * from the API on a few percent of readings.
+ */
+export function round(value: number, places: number): number {
+  const digits = Math.abs(value).toFixed(places + 30);
+  // toFixed prints the exact binary value, so a tie reads "...5000…0".
+  if (/^50*$/.test(digits.slice(-30))) {
+    const f = 10 ** places;
+    const lower = Math.floor(Math.abs(value) * f);
+    return (Math.sign(value) * (lower % 2 === 0 ? lower : lower + 1)) / f;
+  }
+  return Number(value.toFixed(places));
+}
+
+/** A float as Python prints it: 62.0, not 62. Keeps generated sentences identical to the API's. */
+export const pyFloat = (value: number | null) =>
+  value === null ? "None" : Number.isInteger(value) ? value.toFixed(1) : String(value);
 
 export function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const rad = Math.PI / 180;
@@ -132,6 +148,11 @@ function emit(event: LiveEvent) {
   listeners.forEach((listener) => listener(event));
 }
 
+const complaintEvent = (c: Complaint): LiveEvent => ({
+  type: "new_complaint", id: c.id, category: c.category, priority: c.priority,
+  department: c.department, lat: c.lat, lon: c.lon, ts: c.ts,
+});
+
 /**
  * The live feed. As on the server when no CV pipeline is attached, congestion
  * ticks are modelled: one monitored junction every five seconds. Complaints
@@ -139,6 +160,15 @@ function emit(event: LiveEvent) {
  */
 export function subscribeLive(listener: Listener): () => void {
   listeners.add(listener);
+  // A report filed on another page was announced before this page was
+  // listening. Replay this visit's reports, oldest first, so the feed a page
+  // builds from events is not empty for someone who has just filed one.
+  const earlier = submitted.slice(0, 5).reverse();
+  if (earlier.length) {
+    queueMicrotask(() => {
+      if (listeners.has(listener)) earlier.forEach((c) => listener(complaintEvent(c)));
+    });
+  }
   if (!ticker) {
     ticker = setInterval(async () => {
       const spots = await intersections().catch(() => undefined);
@@ -266,6 +296,81 @@ async function congestionHistory(q: URLSearchParams): Promise<CongestionHistoryP
     });
   }
   return out;
+}
+
+/**
+ * Daily complaint volume over the last `days` days, from the current list —
+ * so the window moves with the calendar and counts reports filed this visit,
+ * as the API's does. Timestamps are naive UTC, like the API's.
+ */
+async function complaintHistory(q: URLSearchParams): Promise<ComplaintHistoryPoint[]> {
+  const days = Math.max(1, Math.min(Number(q.get("days") ?? 30), 365));
+  const since = Date.now() - days * 24 * HOUR_MS;
+  const byDay = new Map<string, ComplaintHistoryPoint>();
+  for (const c of await listComplaints()) {
+    const at = Date.parse(/Z$|[+-]\d\d:\d\d$/.test(c.ts) ? c.ts : `${c.ts}Z`);
+    if (!(at >= since)) continue;
+    const day = new Date(at).toISOString().slice(0, 10);
+    const point = byDay.get(day) ?? { day, total: 0, high_priority: 0, resolved: 0 };
+    point.total += 1;
+    if (c.priority === "critical" || c.priority === "high") point.high_priority += 1;
+    if (c.status === "resolved") point.resolved += 1;
+    byDay.set(day, point);
+  }
+  return Array.from(byDay.values()).sort((a, b) => a.day.localeCompare(b.day));
+}
+
+/* ------------------------------------- forecast (port of services/forecasting) */
+
+const FORECAST_HISTORY_DAYS = 14;
+const FORECAST_BAND = 12;
+
+/**
+ * Seasonal-naive forecast: each coming hour is predicted as the mean of what
+ * that hour of the day looked like over the last two weeks. The server reads
+ * those two weeks from its stored snapshots; here they are the same values,
+ * taken from the model, weighted by how many quarter-hour snapshots fall in
+ * each hour of the window.
+ */
+async function forecastIntersection(id: number, q: URLSearchParams): Promise<Response> {
+  const horizon = Number(q.get("horizon_hours") ?? 24);
+  if (!Number.isInteger(horizon) || horizon < 1 || horizon > 168) {
+    return reply({ detail: [{ loc: ["query", "horizon_hours"], msg: "Input should be between 1 and 168" }] }, 422);
+  }
+  const spot = (await intersections()).find((s) => s.id === id);
+  if (!spot) return reply({ detail: "Intersection not found" }, 404);
+
+  const now = Date.now();
+  const since = now - FORECAST_HISTORY_DAYS * 24 * HOUR_MS;
+  const sums = new Array<number>(24).fill(0);
+  const weights = new Array<number>(24).fill(0);
+  const hours: number[] = [];
+  for (let hour = Math.floor(since / HOUR_MS) * HOUR_MS; hour <= now; hour += HOUR_MS) hours.push(hour);
+  const readings = await Promise.all(hours.map((hour) => analyseIntersection(spot, new Date(hour))));
+  hours.forEach((hour, i) => {
+    const first = Math.ceil(Math.max(hour, since) / QUARTER_MS);
+    const last = Math.floor(Math.min(hour + HOUR_MS - 1, now) / QUARTER_MS);
+    if (last < first) return;
+    const hourOfDay = new Date(hour).getUTCHours();
+    sums[hourOfDay] += readings[i].congestion_score * (last - first + 1);
+    weights[hourOfDay] += last - first + 1;
+  });
+
+  const forecast = Array.from({ length: horizon }, (_, i) => {
+    const at = new Date(now + (i + 1) * HOUR_MS);
+    const h = at.getUTCHours();
+    const predicted = weights[h] ? sums[h] / weights[h] : 40;
+    return {
+      ts: at.toISOString().replace("Z", ""),
+      predicted_congestion_score: round(predicted, 1),
+      confidence_low: round(Math.max(0, predicted - FORECAST_BAND), 1),
+      confidence_high: round(Math.min(100, predicted + FORECAST_BAND), 1),
+    };
+  });
+  return reply({
+    intersection_id: id, horizon_hours: horizon, forecast,
+    basis: "history", history_points: weights.reduce((a, b) => a + b, 0),
+  });
 }
 
 /** The KPI set, recomputed from live traffic and the current complaint list. */
@@ -431,11 +536,7 @@ async function submitComplaint(body: { text?: string; lat?: number; lon?: number
     lon: body.lon ?? analysis.lon,
   } as Complaint;
   submitted.unshift(complaint);
-  emit({
-    type: "new_complaint", id: complaint.id, category: complaint.category,
-    priority: complaint.priority, department: complaint.department,
-    lat: complaint.lat, lon: complaint.lon, ts: complaint.ts,
-  });
+  emit(complaintEvent(complaint));
   return reply(complaint);
 }
 
@@ -464,7 +565,7 @@ async function askPlanner(question: string) {
   const facts = [
     ...busiest.map((h) => ({
       text: `${h.intersection_name} currently has the #${h.rank} highest congestion score ` +
-            `in the city at ${h.congestion_score}/100.`,
+            `in the city at ${pyFloat(h.congestion_score)}/100.`,
       tags: CONGESTION_TAGS,
     })),
     ...damage.slice(0, 5).map((d) => ({
@@ -489,8 +590,7 @@ async function askPlanner(question: string) {
     return {
       answer:
         "I don't have enough current data to answer that precisely. " +
-        "Try asking about congestion, complaints, road condition, or " +
-        "recent accidents at a specific intersection or road.",
+        "Try asking about congestion, busy junctions, road condition or maintenance.",
       sources_used: [],
     };
   }
@@ -519,6 +619,7 @@ function tileIndex() {
     cell: index.cell,
     names: new Set(index.tiles),
   }));
+  tileNames.catch(() => { tileNames = undefined; });
   return tileNames;
 }
 
@@ -665,7 +766,9 @@ async function searchPlaces(q: URLSearchParams) {
     const row = place.row;
     if (emirate && row[5] !== emirate) continue;
     if (category && row[3] !== category) continue;
-    const sim = similarity(grams, place.grams);
+    // pg_trgm returns float4, and the comparison widens it to double: a
+    // similarity of exactly 3/10 is 0.30000001… there, and passes "> 0.3".
+    const sim = Math.fround(similarity(grams, place.grams));
     if (sim > 0.22 || place.lower.includes(needle) || (row[2] && row[2].toLowerCase().includes(needle))) {
       placeHits.push({ place, sim });
     }
@@ -686,7 +789,7 @@ async function searchPlaces(q: URLSearchParams) {
     const streetHits: { street: Indexed<StreetRow>; sim: number }[] = [];
     for (const street of streets) {
       if (emirate && street.row[2] !== emirate) continue;
-      const sim = similarity(grams, street.grams);
+      const sim = Math.fround(similarity(grams, street.grams));
       if (sim > 0.3 || street.lower.includes(needle)) streetHits.push({ street, sim });
     }
     streetHits.sort((a, b) => b.sim - a.sim);
@@ -765,12 +868,22 @@ export function distanceToLineM(lat: number, lon: number, line: [number, number]
   return best;
 }
 
+/**
+ * The `lat` and `lon` of a request, or null where the API answers 422. A bare
+ * Number() would read a missing or empty parameter as 0.
+ */
+function coordinates(q: URLSearchParams): [number, number] | null {
+  const [latText, lonText] = [q.get("lat")?.trim(), q.get("lon")?.trim()];
+  if (!latText || !lonText) return null;
+  const [lat, lon] = [Number(latText), Number(lonText)];
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return [lat, lon];
+}
+
 async function reverseGeocode(q: URLSearchParams): Promise<Response> {
-  const lat = Number(q.get("lat"));
-  const lon = Number(q.get("lon"));
-  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
-    return reply({ detail: "lat and lon must be valid coordinates" }, 422);
-  }
+  const point = coordinates(q);
+  if (!point) return reply({ detail: "lat and lon must be valid coordinates" }, 422);
+  const [lat, lon] = point;
   const radiusM = Math.min(Number(q.get("radius_m") ?? 1500), 20000);
   const deg = radiusM / 111_320;
 
@@ -829,16 +942,92 @@ async function reverseGeocode(q: URLSearchParams): Promise<Response> {
 
 /* --------------------------------------------- dispatch and corridor design */
 
-async function nearestFacility(q: URLSearchParams): Promise<Response> {
-  const lat = Number(q.get("lat"));
-  const lon = Number(q.get("lon"));
-  const kind = q.get("facility_type") ?? "hospital";
-  const incidents = await load<{ lat: number; lon: number }[]>("emergency/index.json");
-  const i = incidents.findIndex((p) => Math.abs(p.lat - lat) < 1e-4 && Math.abs(p.lon - lon) < 1e-4);
-  if (i < 0) {
-    return reply({ detail: "Dispatch routing is published for the listed incident locations." }, 404);
+/** OpenStreetMap amenity behind each dispatch service — SERVICE_SUBCATEGORY in emergency.py. */
+const SERVICE_SUBCATEGORY: Record<string, string> = { hospital: "hospital", fire: "fire_station", police: "police" };
+
+interface Facility { id: string; name: string; type: string; lat: number; lon: number; emirate: string | null }
+
+// Which mapped facilities answer a call — RESPONDS / DOES_NOT_RESPOND in
+// emergency.py, where the reasons are given. Keep the two in step.
+const RESPONDS: Record<string, RegExp> = {
+  fire: /fire station|civil defen[cs]e|rescue|الدفاع المدني|مطافي|اطفاء|إطفاء/i,
+  police: /police|شرطة/i,
+};
+const DOES_NOT_RESPOND: Record<string, RegExp> = {
+  fire: /\b(?:co|company|llc|trading|training|safety|systems?)\b/i,
+  police: /college|licens|fine|parking|kiosk|check ?point|medical|social|special tasks|investigation|drugs|community|ministry|office/i,
+};
+const responds = (service: string, name: string) =>
+  (!RESPONDS[service] || RESPONDS[service].test(name)) && !DOES_NOT_RESPOND[service]?.test(name);
+
+// Entries with the same name this close together are one facility mapped twice.
+const SAME_FACILITY_M = 100;
+
+// Speed for the stretch between an address and the nearest routable junction.
+const ACCESS_SPEED_KMH = 30;
+
+/** Every mapped hospital, fire station and police station, as `facility_register` builds it. */
+async function facilityRegister(type?: string | null): Promise<Facility[]> {
+  const { places } = await loadGazetteer();
+  const out: Facility[] = [];
+  const kept = new Map<string, [number, number][]>();
+  for (const service of type ? [type] : Object.keys(SERVICE_SUBCATEGORY)) {
+    const subcategory = SERVICE_SUBCATEGORY[service];
+    if (!subcategory) continue;
+    for (const { row } of places) {
+      if (row[4] !== subcategory || !responds(service, row[1])) continue;
+      const key = `${service}|${row[1].trim().toLowerCase()}`;
+      const sameName = kept.get(key) ?? [];
+      if (sameName.some(([lat, lon]) => haversineKm(row[6], row[7], lat, lon) * 1000 <= SAME_FACILITY_M)) continue;
+      sameName.push([row[6], row[7]]);
+      kept.set(key, sameName);
+      out.push({ id: `osm-${row[0]}`, name: row[1], type: service, lat: row[6], lon: row[7], emirate: row[5] });
+    }
   }
-  return reply(await load(`emergency/${i}-${kind}.json`));
+  return out;
+}
+
+/**
+ * Which facility reaches the incident fastest — `nearest_facility` in
+ * emergency.py: shortlist the four nearest as the crow flies, route to each
+ * over the road network with the blue-light factor, rank by drive time.
+ */
+async function nearestFacility(q: URLSearchParams): Promise<Response> {
+  const point = coordinates(q);
+  if (!point) return reply({ detail: "lat and lon must be valid coordinates" }, 422);
+  const [lat, lon] = point;
+  const kind = q.get("facility_type") ?? "hospital";
+  const candidates = await facilityRegister(kind);
+  if (!candidates.length) return reply({ error: `no facilities of type '${kind}'` });
+
+  const shortlist = candidates
+    .map((f) => ({ ...f, straight_line_km: round(haversineKm(lat, lon, f.lat, f.lon), 2) }))
+    .sort((a, b) => a.straight_line_km - b.straight_line_km)
+    .slice(0, 4);
+
+  const { route } = await import("@/lib/routing");
+  const ranked: Record<string, unknown>[] = [];
+  for (const facility of shortlist) {
+    const entry: Record<string, unknown> = { ...facility };
+    const path = await route([lat, lon], [facility.lat, facility.lon], { emergency: true });
+    if (path.reachable) {
+      // Door to door: add the drive to and from the junctions the route runs between.
+      const accessM = (path.origin_snap_m ?? 0) + (path.destination_snap_m ?? 0);
+      const etaS = (path.eta_seconds as number) + (accessM / 1000 / ACCESS_SPEED_KMH) * 3600;
+      entry.eta_minutes = round(etaS / 60, 1);
+      entry.distance_km = round(((path.distance_m as number) + accessM) / 1000, 2);
+      entry.geometry = path.geometry;
+    }
+    ranked.push(entry);
+  }
+  const cost = (f: Record<string, unknown>) => (f.eta_minutes as number | undefined) ?? (f.straight_line_km as number) * 2;
+  ranked.sort((a, b) => cost(a) - cost(b));
+  ranked.forEach((entry, i) => { entry.rank = i + 1; });
+
+  return reply({
+    incident: { lat, lon }, facility_type: kind, routed_on_real_network: true,
+    candidates: ranked, recommended: ranked[0] ?? null,
+  });
 }
 
 interface DesignRequest {
@@ -908,6 +1097,8 @@ export async function staticFetch(path: string, init?: RequestInit): Promise<Res
         return reply(await kpis());
       case "/api/analytics/history/congestion":
         return reply(await congestionHistory(q));
+      case "/api/analytics/history/complaints":
+        return reply(await complaintHistory(q));
       case "/api/road-damage/priority":
         return reply(
           (await load<RoadDamagePoint[]>("get/road-damage-priority.json")).slice(0, Number(q.get("limit") ?? 10)),
@@ -920,10 +1111,17 @@ export async function staticFetch(path: string, init?: RequestInit): Promise<Res
         return reverseGeocode(q);
       case "/api/emergency/nearest-facility":
         return nearestFacility(q);
+      case "/api/emergency/facilities": {
+        const emirate = q.get("emirate");
+        return reply((await facilityRegister(q.get("facility_type"))).filter((f) => !emirate || f.emirate === emirate));
+      }
       case "/api/network/roads":
         if (q.has("bbox")) return roadsInBox(q);
         break;
     }
+    const forecast = /^\/api\/prediction\/intersection\/(\d+)$/.exec(route);
+    if (forecast) return forecastIntersection(Number(forecast[1]), q);
+
     const hit = (await recorded(canonical(route, q))) ?? (Array.from(q.keys()).length ? undefined : await recorded(route));
     if (hit !== undefined) return reply(hit);
     if (route === "/api/places") return reply(await listPlaces(q));

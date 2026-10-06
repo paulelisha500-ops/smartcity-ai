@@ -26,7 +26,9 @@ export default function PlannerPage() {
     try {
       const res = await api.askPlanner(q);
       setTurns((t) => [...t, { question: q, answer: res.answer, sources: res.sources_used }]);
-      setQuestion("");
+      // Clear the box only if it holds what was asked: a suggestion chip must
+      // not wipe a question the user is halfway through typing.
+      setQuestion((current) => (current === q ? "" : current));
     } catch (e) {
       setTurns((t) => [...t, { question: q, answer: describeError(e, "The planner couldn't answer that."), sources: [] }]);
     } finally {
@@ -86,6 +88,7 @@ export default function PlannerPage() {
         <input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
+          aria-label="Ask the city planner"
           placeholder="Ask about congestion, road condition, or maintenance…"
           className="flex-1 bg-blueprint-900 border hairline px-3 py-2 text-sm text-paper placeholder:text-paper/30 focus:outline-none focus:border-signal-amber"
         />

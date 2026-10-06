@@ -208,6 +208,23 @@ export interface ComplaintHistoryPoint {
   resolved: number;
 }
 
+/* --------------------------------------------------------------------- M4 */
+export interface ForecastPoint {
+  ts: string;
+  predicted_congestion_score: number;
+  confidence_low: number;
+  confidence_high: number;
+}
+
+export interface Forecast {
+  intersection_id: number;
+  horizon_hours: number;
+  forecast: ForecastPoint[];
+  /** "history": from stored readings. "typical_pattern": no history yet. */
+  basis?: "history" | "typical_pattern";
+  history_points?: number;
+}
+
 /* --------------------------------------------------------------------- M9 */
 export interface CameraRow {
   id: number;
@@ -455,7 +472,7 @@ export const api = {
   liveTraffic: () => request<TrafficReading[]>("/api/traffic/live"),
   hotspots: (limit = 5) => request<Hotspot[]>(`/api/traffic/hotspots?limit=${limit}`),
   forecast: (intersectionId: number, horizonHours = 24) =>
-    request(`/api/prediction/intersection/${intersectionId}?horizon_hours=${horizonHours}`),
+    request<Forecast>(`/api/prediction/intersection/${intersectionId}?horizon_hours=${horizonHours}`),
 
   /* M2 */
   roadDamagePriority: (limit = 10) =>

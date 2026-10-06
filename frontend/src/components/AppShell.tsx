@@ -3,23 +3,35 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
-import { getSession } from "@/lib/auth";
+import { getSession, homeRouteForRole } from "@/lib/auth";
+import { canAccess, isConsoleRoute } from "@/lib/nav";
 
 /**
  * Decides which chrome a route gets, and gates the console behind a session.
  *
  * Public routes render edge-to-edge with no sidebar; console routes get the
- * operations sidebar and require a valid token. The gate is a UX affordance,
- * not a security boundary — the API enforces roles server-side, which is where
- * authorisation has to live.
+ * operations sidebar, require a session, and are closed to roles they are not
+ * for. The gate is a UX affordance, not a security boundary — the API enforces
+ * roles server-side, which is where authorisation has to live.
+ *
+ * Anything that is neither is an address that does not exist: it renders bare
+ * so the not-found page shows, instead of being treated as a console page and
+ * bounced to the welcome screen with no explanation.
  */
 const PUBLIC_ROUTES = ["/welcome", "/login", "/about", "/faq", "/report"];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const isPublic = PUBLIC_ROUTES.includes(pathname);
-  const [checked, setChecked] = useState(false);
+  const isPublic = PUBLIC_ROUTES.includes(pathname) || !isConsoleRoute(pathname);
+  // Access is decided during render, from the session as it is now — never
+  // from a remembered earlier answer, which could let a page paint after
+  // sign-out. It waits for mount because the session lives in the browser:
+  // the server-rendered HTML must match the first client render.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const session = mounted && !isPublic ? getSession() : null;
+  const allowed = !!session && canAccess(session.role, pathname);
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Close the drawer on navigation and on Escape.
@@ -32,16 +44,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [menuOpen]);
 
   useEffect(() => {
-    if (isPublic) {
-      setChecked(true);
-      return;
-    }
-    if (!getSession()) {
-      router.replace("/welcome");
-      return;
-    }
-    setChecked(true);
-  }, [pathname, isPublic, router]);
+    if (!mounted || isPublic || allowed) return;
+    const current = getSession();
+    router.replace(current ? homeRouteForRole(current.role) : "/welcome");
+  }, [mounted, isPublic, allowed, pathname, router]);
 
   // A 401 from any request (token expired mid-session) fires this from
   // lib/api.ts. Listened for at the shell level rather than per-page, so
@@ -62,7 +68,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   // Avoid painting the console for an instant before redirecting away.
-  if (!checked) {
+  if (!allowed) {
     return (
       <main className="min-h-screen grid place-items-center">
         <div className="font-mono text-xs text-blueprint-line/50">Checking session…</div>

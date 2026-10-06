@@ -1,0 +1,7 @@
+# The image runs `npm install` itself; host installs, build output and the
+# published data set must not be copied over it.
+node_modules
+.next
+out
+public/data
+e2e

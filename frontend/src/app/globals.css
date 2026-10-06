@@ -249,6 +249,10 @@ h1, h2, h3, .font-display {
 .leaflet-container {
   background: #071626 !important;
   font-family: var(--font-mono);
+  /* Leaflet's panes and controls carry z-indexes up to 1000. Without a
+     stacking context of its own the map paints over the phone menu bar and
+     the open menu drawer. */
+  z-index: 0;
 }
 .leaflet-popup-content-wrapper {
   background: #163B60;
